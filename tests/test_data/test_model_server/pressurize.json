@@ -1,0 +1,14 @@
+{
+    "deployment_name": "pressurize_test",
+    "aws_region": "us-west-2",
+    "models": [
+	{
+	    "name": "TestModel",
+	    "path": "TestModel.TestModel",
+	    "methods": ["predict"],
+	    "required_resources": [
+		"s3://testbucket/TestModel/parameters.zip"
+	    ]
+	}
+    ]
+}
