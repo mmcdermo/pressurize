@@ -18,6 +18,7 @@ class ResourceManager(object):
     """
     def __init__(self, controller):
         self._controller = controller
+        self._aws_manager = self._controller._aws_manager
 
     def _cluster_name(self):
         return self._controller.deployment_name + "Cluster"
@@ -68,48 +69,46 @@ class ResourceManager(object):
 
         return bucket_resources
 
-    def elastic_beanstalk_bucket(self, name):
-        return "pressurizebucket" + sanitize(name)
+    def elastic_beanstalk_bucket(self):
+        return "pressurizebucket" + sanitize(self._controller.config['deployment_name'])
 
     def cname_prefix(self, name):
-        return "pressurize-" + sanitize(name)
+        return sanitize(self._controller.config["deployment_name"]) + "-" + sanitize(name)
 
-    def elastic_beanstalk_resources(self, name, version, source_file, config_options):
+    def elastic_beanstalk_model_resources(self, name, version, source_file, config_options):
         """
-        manager = ElasticBeanstalkManager(self.context)
-        self.upload_app(manager, bucket_name)
+        Create RedLeader resources for a single elastic beanstalk model deployment
         """
-
-        app = ElasticBeanstalkAppResource(self.context, sanitize(name))
+        context = AWSContext(aws_region=self._controller.config['aws_region'])
+        app = ElasticBeanstalkAppResource(context, sanitize(name))
         cname_prefix = self.cname_prefix(name)
         version = ElasticBeanstalkAppVersionResource(
-            self.context,
+            context,
             app,
-            self.elastic_beanstalk_bucket(name),
+            self.elastic_beanstalk_bucket(),
             source_file.split("/")[-1],
             version)
 
         config = ElasticBeanstalkConfigTemplateResource(
-            self.context,
+            context,
             app,
             config_options,
             solution_stacks["docker"],
             "Pressurize docker elastic beanstalk config %s" % name)
 
         env = ElasticBeanstalkEnvResource(
-            self.context,
+            context,
             app,
             version,
             config,
             cname_prefix,
-            "Pressurize env %s" % n
+            "Pressurize env %s" % name
         )
         return [app, version, config, env]
 
     def create_model_cluster(self, source_file, model_name, min_size=1, max_size=2):
-        context = AWSContext()
-        cluster = Cluster(self._cluster_name() + model_name, context)
-        resources = self.elastic_beanstalk_resources()
+        context = AWSContext(aws_region=self._controller.config['aws_region'])
+        cluster = Cluster(sanitize(self._cluster_name() + model_name), context)
         version = str(random.randint(0, 100000))
 
         config_options = {
@@ -122,10 +121,10 @@ class ResourceManager(object):
             }
         }
 
-        resources = elastic_beanstalk_resources(model_name,
-                                    version,
-                                    source_file,
-                                    config_options)
+        resources = self.elastic_beanstalk_model_resources(model_name,
+                                                           version,
+                                                           source_file,
+                                                           config_options)
         for resource in resources:
             cluster.add_resource(resource)
 
@@ -134,6 +133,8 @@ class ResourceManager(object):
     def create_general_cluster(self):
         """
         Create a RedLeader cluster for AWS resource creation
+
+        Not currently used.
         """
         context = AWSContext()
         cluster = Cluster(self._cluster_name(), context)

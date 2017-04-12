@@ -4,7 +4,7 @@
  Usage: python model_server.py
 
  This server uses a separate process to perform predictions, with a pipe
- from `multiprocessing` connecting each flask server thread to the prediction
+ from `multiprocessing` connecting the flask server thread to the prediction
  process. Access to the server side of the pipe is guarded by a Lock from multiprocessing.
 """
 
@@ -25,11 +25,10 @@ app = Flask(__name__)
 
 @app.route('/api/<string:model>/<string:method>/', methods=['POST'])
 def executeModelMethod(model, method):
-    data = request.form.get('data', '')
-    if data == "":
+    data = request.get_json()
+    if data is None:
         print("Data not provided")
         return make_response(jsonify({'error': 'Data not provided'}), 400)
-    data = json.loads(data)
 
     if model not in pipes:
         print("Error: Model does not exist")
@@ -63,13 +62,11 @@ class ModelServer(object):
                 item = self._pipe.recv()
                 if not hasattr(self._model, item['method']):
                     self._pipe.send({"error": "Model does not have method %s" % item['method']})
-                #try:
-                if True:
+                try:
                     preprocessed = self._model.preprocess(item["data"])
                     result = getattr(self._model, item['method'])(preprocessed)
                     self._pipe.send({"result": result})
-                else:
-                    #except Exception as e:
+                except Exception as e:
                     self._pipe.send({"error": "Exception: "+str(e)})
 
 def import_model(path, source_path):
@@ -78,10 +75,8 @@ def import_model(path, source_path):
     e.g.) given the path "TestModel.TestModel", imports:
           import TestModel from TestModel.TestModel
     """
-    print(path)
     filepath = os.path.join(*path.split('.')) + '.py'
     fullpath = os.path.join(source_path, filepath)
-    print("FULLPATH", fullpath)
     spec = importlib.util.spec_from_file_location(path, fullpath)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

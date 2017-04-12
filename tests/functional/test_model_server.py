@@ -26,11 +26,12 @@ class TestModelServer(unittest.TestCase):
                           port='6043',
                           separate_process=True)
         print("About to sleep")
-        time.sleep(5)
+        time.sleep(1)
         print("Done sleeping")
         value = random.randint(0, 100000)
-        r = requests.post("http://localhost:6043/api/TestModel/predict/",
-                          data={"data": json.dumps({"number": value})})
+        url = "http://localhost:6043/api/TestModel/predict/"
+        #url =  "http://pressurizetest-TestModel.us-west-2.elasticbeanstalk.com/api/TestModel/predict/"
+        r = requests.post(url, json={"data": {"number": value}})
         self.assertEqual(200, r.status_code)
         j = r.json()
         self.assertEqual(j['result']['number'], value + 1)

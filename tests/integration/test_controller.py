@@ -17,6 +17,7 @@ class TestController(unittest.TestCase):
             "aws_region": "us-west-2",
             "models": [
 	        {
+                    "path": "TestModel.TestModel",
 	            "name": "TestModel",
 	            "methods": ["predict"],
 	            "required_resources": [
@@ -29,29 +30,22 @@ class TestController(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def test_controller(self):
-        controller = Controller(self.config)
-        controller.run()
-
-        resources = ResourceManager(controller)
-        cluster = resources.createResourceCluster()
-
-    def test_deploy_api(self):
-        controller = Controller(self.config)
-        controller.create_resources()
-
-    def test_deploy_models(self):
-        controller = Controller(self.config)
-        controller.create_resources()
-        raise NotImplementedError
-
     def test_create_elastic_beanstalk_package(self):
-        fn = create_elastic_beanstalk_package()
+        controller = Controller(self.config)
+        source_path = "/" + os.path.join(*(__file__.split("/")[:-2] + ["test_data", "test_model_server"]))
+        fn = controller.create_model_package(source_path, "TestModel")
         zf = zipfile.ZipFile(fn)
         self.assertTrue(len(zf.infolist()) > 10)
         zf.close()
 
+    def test_deploy_model_env(self):
+        controller = Controller(self.config)
+        source_path = "/" + os.path.join(*(__file__.split("/")[:-2] + ["test_data", "test_model_server"]))
+        #controller.destroy_model_cluster("TestModel")
+        controller.deploy_model(source_path, "TestModel")
+
     def test_deploy_integration(self):
+        return
         controller = Controller(self.config)
 
         # Create cluster if needed

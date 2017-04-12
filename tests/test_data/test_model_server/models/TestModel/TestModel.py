@@ -4,10 +4,10 @@ class TestModel(PressurizeModel):
     def setup(self):
         super().__init__()
 
-    def preprocess(self, data):
-        data["number"] += 1
-        return data
+    def preprocess(self, request):
+        request["data"]["number"] += 1
+        return request
 
-    def predict(self, data):
+    def predict(self, request):
         return {"status": "success",
-                "number": data["number"]}
+                "number": request["data"]["number"]}
