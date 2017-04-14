@@ -7,12 +7,13 @@ elastic beanstalk environments
 """
 import os
 import os.path
-from zipfile import ZipFile
-
 import json
 import time
 import datetime
+from zipfile import ZipFile
 from threading import Thread
+
+import botocore
 
 from redleader.managers import ElasticBeanstalkManager
 
@@ -28,8 +29,10 @@ class Controller(object):
         self.config = config
         self.local_queues = {}
 
-        for key in config:
-            setattr(self, key, config[key])
+        # Create map of models for efficient lookup
+        self.models = {}
+        for model in self.config['models']:
+            self.models[model['name']] = model
 
         for key in self._defaults:
             if key not in config:
@@ -37,7 +40,6 @@ class Controller(object):
 
         self._aws_manager = AWSManager.AWSManager()
 
-        # Deploy cluster on initialization
         self._resource_manager = ResourceManager.ResourceManager(self)
 
     def create_resources(self, force_update=False):
@@ -78,6 +80,28 @@ class Controller(object):
         new_config['models'] = list(filter(lambda x: x['name'] == model_name, new_config['models']))
         return new_config
 
+    def create_api_package(self):
+        """
+        Creates a zip package deployable to elastic beanstalk for the pressurize API
+        """
+        template_dir = "/" + os.path.join(*(__file__.split("/")[:-1] + ["api"]))
+        filename = "deploy_api.zip"
+        target = os.path.join(os.getcwd(), filename)
+        try:
+            os.remove(target)
+        except FileNotFoundError:
+            pass
+
+        with ZipFile(target, 'w') as zipfile:
+            self.recursively_add_files_to_zip(template_dir, zipfile)
+
+            # Write the custom config for this particular model server
+            tmpfile = '/tmp/custom_api_config.json'
+            with open(tmpfile, 'w') as f:
+                json.dump(self.config, f)
+            zipfile.write(tmpfile, 'pressurize.json')
+        return filename
+
     def create_model_package(self, source_path, model_name):
         """
         Creates a zip package deployable to elastic beanstalk for the given model
@@ -85,7 +109,10 @@ class Controller(object):
         template_dir = "/" + os.path.join(*(__file__.split("/")[:-1] + ["model", "deploy_template"]))
         filename = "deploy_model_%s.zip" % model_name
         target = os.path.join(os.getcwd(), filename)
-        os.remove(target)
+        try:
+            os.remove(target)
+        except FileNotFoundError:
+            pass
 
         with ZipFile(target, 'w') as zipfile:
             self.recursively_add_files_to_zip(template_dir, zipfile)
@@ -99,7 +126,26 @@ class Controller(object):
             zipfile.write(tmpfile, 'pressurize.json')
         return filename
 
-    def deploy_model(self, source_path, model_name):
+    def deploy_api(self):
+        """
+        Deploys an elastic beanstalk environment for the pressurize API
+        """
+        packagefile = self.create_api_package()
+        print("Created API elastic beanstalk package ", packagefile)
+        bucket_name = self._resource_manager.elastic_beanstalk_bucket()
+        manager = ElasticBeanstalkManager(self._aws_manager)
+        manager.upload_package(bucket_name, os.path.join(os.getcwd(), packagefile), packagefile)
+        cluster = self._resource_manager.create_api_cluster(packagefile)
+        try:
+            cluster.blocking_deploy()
+        except botocore.exceptions.ClientError as e:
+            if "exists" in "%s" % e:
+                print("Cluster already exists. Updating")
+                cluster.blocking_update()
+            else:
+                raise e
+
+    def deploy_model(self, source_path, model_name, blocking=True):
         """
         Deploys an elastic beanstalk environment for the given model
         """
@@ -110,20 +156,40 @@ class Controller(object):
         manager.upload_package(bucket_name, os.path.join(os.getcwd(), packagefile), packagefile)
         cluster = self._resource_manager.create_model_cluster(packagefile, model_name)
         try:
-            cluster.blocking_deploy()
+            if blocking:
+                cluster.blocking_deploy()
+            else:
+                cluster.deploy()
         except botocore.exceptions.ClientError as e:
             if "exists" in "%s" % e:
                 print("Cluster already exists. Updating")
-                cluster.blocking_update()
+                if blocking:
+                    cluster.blocking_update()
+                else:
+                    cluster.update()
             else:
                 raise e
+
+    def deploy_models(self):
+        source_path = "/" + os.path.join(*(__file__.split("/")[:-2] + ["test_data", "test_model_server"]))
+        for model in self.models:
+            print("Deploying model %s" % model)
+            self.deploy_model(source_paths, model, blocking=False)
+
+    def destroy_api_cluster(self):
+        """
+        Destroys the elastic beanstalk environment for the given model
+        """
+        filename = "deploy_api.zip"
+        cluster = self._resource_manager.create_api_cluster(filename)
+        cluster.blocking_delete()
 
     def destroy_model_cluster(self, model_name):
         """
         Destroys the elastic beanstalk environment for the given model
         """
-        filename = "deploy_model_%s.zip" % model_name
-        cluster = self._resource_manager.create_model_cluster(filename, model_name)
+        filename = "deploy_model_%s.zip"
+        cluster = self._resource_manager.create_api_cluster(filename)
         cluster.blocking_delete()
 
 

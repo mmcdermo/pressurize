@@ -6,9 +6,9 @@
 	    "name": "TestModel",
 	    "path": "TestModel.TestModel",
 	    "methods": ["predict"],
-	    "required_resources": [
-		"s3://testbucket/TestModel/parameters.zip"
-	    ]
+	    "required_resources": {
+		"parameters": "s3://pressurizetest-parameters/TestModel/parameters.txt"
+	    }
 	}
     ]
 }

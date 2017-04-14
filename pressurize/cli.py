@@ -29,11 +29,8 @@ def deploy(ctx, aws_profile):
     try:
         controller = pressurize.Controller(config)
     except Exception as e:
-        click.echo('Error with config: %s' % e)
+       click.echo('Error with config: %s' % e)
         raise click.Abort()
-
-    # Create cluster if needed
-    perssurize.create_resources()
 
     # Deploy API
     controller.deploy_api()

@@ -1,8 +1,8 @@
 from contextlib import contextmanager
 
 class PressurizeModel(object):
-    def setup(self):
-        raise NotImplementedError
+    def __init__(self, resources):
+        self.resources = resources
 
     @contextmanager
     def modelcontext(self):
