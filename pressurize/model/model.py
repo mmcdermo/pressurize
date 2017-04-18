@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+import tensorflow as tf
 
 class PressurizeModel(object):
     def __init__(self, resources):
@@ -18,6 +19,9 @@ class PressurizeModel(object):
         raise NotImplementedError
 
 class PressurizeTFModel(PressurizeModel):
+    def tf_setup(self):
+        raise NotImplementedError
+
     @contextmanager
     def modelcontext(self, device="/cpu:0"):
         """
@@ -27,4 +31,5 @@ class PressurizeTFModel(PressurizeModel):
         graph = tf.Graph()
         with graph.as_default():
             with tf.device(device):
+                self.tf_setup()
                 yield

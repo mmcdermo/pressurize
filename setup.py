@@ -8,7 +8,7 @@ install_requires = [
 ]
 
 setup(
-    name='perssurize',
+    name='pressurize',
     version='0.1',
     description='Cloud Machine Learning Deployment',
     author='Morgan McDermott',

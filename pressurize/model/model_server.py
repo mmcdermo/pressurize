@@ -26,8 +26,8 @@ class ModelServer(object):
     def __init__(self, config, source_path, resource_path, model_conf, pipe):
         self._pipe = pipe
         self._resources = ModelServer.acquire_resources(config, model_conf, resource_path)
-        self._model = ModelServer.import_model(
-            model_conf['path'], source_path)(self._resources)
+        self._model_class = ModelServer.import_model(model_conf['path'], source_path)
+        self._model = self._model_class(self._resources)
 
     def run(self):
         with self._model.modelcontext():
@@ -41,6 +41,7 @@ class ModelServer(object):
                     self._pipe.send({"result": result})
                 except Exception as e:
                     self._pipe.send({"error": "Exception: "+str(e)})
+                    raise e
 
     @staticmethod
     def import_model(path, source_path):
@@ -64,6 +65,7 @@ class ModelServer(object):
         resources = {}
         for resource_name in model['required_resources']:
             s3_path = model['required_resources'][resource_name]
+            print("Downloading resource %s from %s" % (resource_name, s3_path))
             parts = s3_path.split("/")
             if len(parts) < 4:
                 raise RuntimeError("Invalid s3 resource in config: " + resource)

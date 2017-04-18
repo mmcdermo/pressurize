@@ -33,6 +33,7 @@ class TestController(unittest.TestCase):
     def tearDown(self):
         session = boto3.Session(profile_name="testing")
         client = session.client('s3')
+        return #
         self.cleanup_buckets(client, "pressurizetest")
 
     @staticmethod
@@ -89,6 +90,14 @@ class TestController(unittest.TestCase):
     def test_deploy_api_env(self):
         controller = Controller(self.config)
         controller.deploy_api()
+
+    def test_run_local(self):
+        conf = self.config
+        conf["models"][0]["required_resources"] = {}
+        print(json.dumps(conf, indent=4))
+        controller = Controller(conf)
+        source_path = "/" + os.path.join(*__file__.split("/")[:-2] + ["test_data", "test_model_server"])
+        controller.run_local("TestModel", source_path=source_path, port='6789')
 
     def test_deploy_integration(self):
         return

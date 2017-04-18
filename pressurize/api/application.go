@@ -17,7 +17,7 @@ type Model struct {
 	Path string `json:"path"`
 	Name string `json:"name"`
 	Methods []string `json:"methods"`
-	RequiredResources []string `json:"required_resources, omitempty"`
+	RequiredResources map[string]string `json:"required_resources, omitempty"`
 	MinECUPerInstance []string `json:"min_ecu_per_instance,omitempty"`
 	MinMemoryPerInstance []string `json:"min_memory_per_instance,omitempty"`
 }
@@ -70,12 +70,9 @@ func GetMethodURL(model_name string, method_name string) string {
 }
 
 func ModelInstanceRequest(model_name string, method_name string, data interface{}) (map[string]interface{}, error) {
-	payload := map[string]interface{}{
-		"data": data,
-	}
 	result := make(map[string]interface{})
 	err := PerformRequestAndDecode(GetMethodURL(model_name, method_name),
-		"POST", payload, &(result))
+		"POST", data, &(result))
 	return result, err
 }
 

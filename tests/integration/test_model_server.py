@@ -59,7 +59,7 @@ class TestModelServer(unittest.TestCase):
         self.upload_test_parameters(bucket_name)
 
         process = server.run_server(config,
-                          source_path=os.path.join(test_model_dir, "models"),
+                          source_path=os.path.join(test_model_dir),
                           port='6043',
                           separate_process=True)
         print("About to sleep")

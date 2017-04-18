@@ -3,9 +3,12 @@ import json
 import os.path
 import click
 import pressurize
+from pressurize import Controller
+
+import botocore
 
 @click.group()
-@click.version_option(version=Pressurize.__version__, message='%(prog)s %(version)s')
+@click.version_option(version=pressurize.__version__, message='%(prog)s %(version)s')
 @click.option('--debug/--no-debug', default=False,
               help='Write debug logs to standard error.')
 @click.pass_context
@@ -25,33 +28,144 @@ def deploy(ctx, aws_profile):
         click.echo('No pressurize.json file found in directory')
         raise click.Abort()
 
-    config = json.loads(os.path.join(ctx.obj['project_dir'], ctx.obj['config_file']))
+    print("Config path", os.path.join(ctx.obj['project_dir'], ctx.obj['config_file']))
+    with open(os.path.join(ctx.obj['project_dir'], ctx.obj['config_file']), 'r') as f:
+        config = json.load(f)
     try:
-        controller = pressurize.Controller(config)
+        controller = Controller.Controller(config)
     except Exception as e:
        click.echo('Error with config: %s' % e)
-        raise click.Abort()
+       raise click.Abort()
 
     # Deploy API
-    controller.deploy_api()
+    try:
+        controller.deploy_api()
+    except botocore.exceptions.ClientError as e:
+        print("Failed to deploy API. %s" % e)
 
     # Deploy Models
-    controller.deploy_models()
+    try:
+        controller.deploy_models()
+    except botocore.exceptions.ClientError as e:
+        print("Failed to deploy models. %s" % e)
 
-@controller.command()
+
+@cli.command(name="deploy-model")
+@click.argument("model_name")
+@click.option('--aws-profile', default=None,
+              help='AWS Profile to use for cluster commands')
 @click.pass_context
-def local(ctx):
+def deploy_model(ctx, model_name, aws_profile):
     if ctx.obj['config_file'] not in os.listdir(ctx.obj['project_dir']):
         click.echo('No pressurize.json file found in directory')
         raise click.Abort()
 
-    config = json.loads(os.path.join(ctx.obj['project_dir'], ctx.obj['config_file']))
+    print("Config path", os.path.join(ctx.obj['project_dir'], ctx.obj['config_file']))
+    with open(os.path.join(ctx.obj['project_dir'], ctx.obj['config_file']), 'r') as f:
+        config = json.load(f)
     try:
-        controller = Pressurize.Controller(config)
+        controller = Controller.Controller(config)
+    except Exception as e:
+       click.echo("Error with config: %s" % e)
+       raise click.Abort()
+
+    if model_name not in controller.models:
+        click.echo("Model %s not found in config")
+        raise click.Abort()
+
+    # Deploy Model
+    source_path = os.getcwd()
+    try:
+        controller.deploy_model(source_path, model_name)
+    except botocore.exceptions.ClientError as e:
+        print("Failed to deploy model %s. %s" % (model_name, e))
+
+@cli.command(name="deploy-models")
+@click.option('--aws-profile', default=None,
+              help='AWS Profile to use for cluster commands')
+@click.pass_context
+def deploy_models(ctx, aws_profile):
+    if ctx.obj['config_file'] not in os.listdir(ctx.obj['project_dir']):
+        click.echo('No pressurize.json file found in directory')
+        raise click.Abort()
+
+    print("Config path", os.path.join(ctx.obj['project_dir'], ctx.obj['config_file']))
+    with open(os.path.join(ctx.obj['project_dir'], ctx.obj['config_file']), 'r') as f:
+        config = json.load(f)
+    try:
+        controller = Controller.Controller(config)
+    except Exception as e:
+       click.echo("Error with config: %s" % e)
+       raise click.Abort()
+
+    # Deploy Models
+    try:
+        controller.deploy_models()
+        print("------------------------")
+        print("Models are being updated.")
+    except botocore.exceptions.ClientError as e:
+        print("Failed to deploy models. %s" % e)
+
+@cli.command(name="deploy-api")
+@click.option('--aws-profile', default=None,
+              help='AWS Profile to use for cluster commands')
+@click.pass_context
+def deploy_api(ctx, aws_profile):
+    if ctx.obj['config_file'] not in os.listdir(ctx.obj['project_dir']):
+        click.echo('No pressurize.json file found in directory')
+        raise click.Abort()
+
+    print("Config path", os.path.join(ctx.obj['project_dir'], ctx.obj['config_file']))
+    with open(os.path.join(ctx.obj['project_dir'], ctx.obj['config_file']), 'r') as f:
+        config = json.load(f)
+    try:
+        controller = Controller.Controller(config)
+    except Exception as e:
+       click.echo("Error with config: %s" % e)
+       raise click.Abort()
+
+    # Deploy Models
+    try:
+        controller.deploy_api()
+    except botocore.exceptions.ClientError as e:
+        print("Failed to deploy API. %s" % e)
+
+@cli.command()
+@click.pass_context
+@click.argument("model_name")
+@click.option("--port", default=5001)
+def local(ctx, model_name, port):
+    if ctx.obj['config_file'] not in os.listdir(ctx.obj['project_dir']):
+        click.echo('No pressurize.json file found in directory')
+        raise click.Abort()
+
+    print("Config path", os.path.join(ctx.obj['project_dir'], ctx.obj['config_file']))
+    with open(os.path.join(ctx.obj['project_dir'], ctx.obj['config_file']), 'r') as f:
+        config = json.load(f)
+    try:
+        controller = Controller.Controller(config)
     except Exception as e:
         click.echo('Error with config: %s' % e)
         raise click.Abort()
-    controller.launch()
+    controller.run_local(model_name, port=port)
+
+@cli.command(name="dry-run")
+@click.pass_context
+def dry_run(ctx):
+    if ctx.obj['config_file'] not in os.listdir(ctx.obj['project_dir']):
+        click.echo('No pressurize.json file found in directory')
+        raise click.Abort()
+
+    print("Config path", os.path.join(ctx.obj['project_dir'], ctx.obj['config_file']))
+    with open(os.path.join(ctx.obj['project_dir'], ctx.obj['config_file']), 'r') as f:
+        config = json.load(f)
+    try:
+        controller = Controller.Controller(config)
+    except Exception as e:
+        click.echo('Error with config: %s' % e)
+        raise click.Abort()
+    print(json.dumps(controller.deploy_api(dry_run=True), indent=4))
+    print(json.dumps(controller.deploy_models(dry_run=True), indent=4))
 
 def main():
     cli(obj={})

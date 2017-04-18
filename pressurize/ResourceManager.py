@@ -21,10 +21,10 @@ class ResourceManager(object):
         self._aws_manager = self._controller._aws_manager
 
     def _cluster_name(self):
-        return self._controller.config['deployment_name'] + "Cluster"
+        return self._controller.config["deployment_name"] + "Cluster"
 
     def prefix_name(self, name):
-        return self._controller.deployment_name + name
+        return self._controller.config["deployment_name"] + name
 
     def default_dynamo_tables(self, context):
         """
@@ -48,20 +48,20 @@ class ResourceManager(object):
         )
         return [model_instance_state_table]
 
-    def bucket_resources(self, context, config):
+    def bucket_resources(self, context, model):
         """
         Create RedLeader bucket resources for any referenced buckets,
         so that our deployed elastic beanstalk applications can be granted
         appropriate IAM permissions
         """
         bucket_names = {}
-        for model in config["models"]:
-            for resource in model["required_resources"]:
-                if("s3://" in resource):
-                    parts = resource.split("/")
-                    if len(parts < 3):
-                        raise RuntimeError("Invalid s3 url in configuration: %s" % resource)
-                    bucket_names[parts[2]] = True
+        for resource_name in model["required_resources"]:
+            resource = model["required_resources"][resource_name]
+            if("s3://" in resource):
+                parts = resource.split("/")
+                if len(parts) < 3:
+                    raise RuntimeError("Invalid s3 url in configuration: %s" % resource)
+                bucket_names[parts[2]] = True
 
         bucket_resources = []
         for bucket_name in bucket_names:
@@ -80,7 +80,7 @@ class ResourceManager(object):
         Create RedLeader resources for the API elastic beanstalk deployment
         """
         context = AWSContext(aws_region=self._controller.config['aws_region'])
-        app = ElasticBeanstalkAppResource(context, "api")
+        app = ElasticBeanstalkAppResource(context, self.prefix_name("api"))
         cname_prefix = self.cname_prefix("api")
         version = ElasticBeanstalkAppVersionResource(
             context,
@@ -109,8 +109,11 @@ class ResourceManager(object):
         Create RedLeader resources for a single elastic beanstalk model deployment
         """
         context = AWSContext(aws_region=self._controller.config['aws_region'])
-        app = ElasticBeanstalkAppResource(context, sanitize(name))
+        app = ElasticBeanstalkAppResource(context, self.prefix_name(sanitize(name)))
         cname_prefix = self.cname_prefix(name)
+        model_config = self._controller.models[name]
+        bucket_resources = self.bucket_resources(context, model_config)
+        permission_resources = list(map(lambda x: r.ReadWritePermission(x), bucket_resources))
         version = ElasticBeanstalkAppVersionResource(
             context,
             app,
@@ -122,7 +125,9 @@ class ResourceManager(object):
             app,
             config_options,
             solution_stacks["docker"],
-            "Pressurize docker elastic beanstalk config %s" % name)
+            "Pressurize docker elastic beanstalk config %s" % name,
+            permission_resources=permission_resources
+        )
         env = ElasticBeanstalkEnvResource(
             context,
             app,
@@ -131,7 +136,7 @@ class ResourceManager(object):
             cname_prefix,
             "Pressurize env %s" % name
         )
-        return [app, version, config, env]
+        return [app, version, config, env] + bucket_resources
 
     def create_api_cluster(self, source_file, min_size=1, max_size=2):
         """
@@ -155,14 +160,14 @@ class ResourceManager(object):
             "aws:autoscaling:launchconfiguration": {
                 "InstanceType": conf.get('api_instance_type', 't2.micro')
             },
-            "aws:elasticbeanstalk:healthreporting:system": {
-                "SystemType": "enhanced"
-            },
             "aws:elasticbeanstalk:command": {
                 "DeploymentPolicy": "Immutable"
             },
             "aws:autoscaling:updatepolicy:rollingupdate": {
                 "RollingUpdateType": "Immutable"
+            },
+            "aws:elasticbeanstalk:healthreporting:system": {
+                "SystemType": "enhanced"
             },
             "aws:elasticbeanstalk:environment": {
                 "EnvironmentType": "LoadBalanced"
@@ -231,7 +236,8 @@ class ResourceManager(object):
         if 'required_ecu' in model_config:
             instance_type = self.determine_instance_type(
                 model_config['required_ecu'],
-                model_config['required_memory'])
+                model_config['required_memory'])['name']
+            print("Determined instance type: ", instance_type)
         if 'instance_type' in model_config:
             instance_type = model_config['instance_type']
 
@@ -243,14 +249,14 @@ class ResourceManager(object):
             "aws:autoscaling:launchconfiguration": {
                 "InstanceType": instance_type
             },
-            "aws:elasticbeanstalk:healthreporting:system": {
-                "SystemType": "enhanced"
-            },
             "aws:elasticbeanstalk:command": {
                 "DeploymentPolicy": "Immutable"
             },
             "aws:autoscaling:updatepolicy:rollingupdate": {
                 "RollingUpdateType": "Immutable"
+            },
+            "aws:elasticbeanstalk:healthreporting:system": {
+                "SystemType": "enhanced"
             },
             "aws:elasticbeanstalk:environment": {
                 "EnvironmentType": "LoadBalanced"
@@ -260,6 +266,7 @@ class ResourceManager(object):
                                                            version,
                                                            source_file,
                                                            config_options)
+
         for resource in resources:
             cluster.add_resource(resource)
         return cluster
