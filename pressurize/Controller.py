@@ -16,6 +16,7 @@ import importlib.util
 import shutil
 import random
 import botocore
+import subprocess
 
 from redleader.managers import ElasticBeanstalkManager
 
@@ -152,7 +153,7 @@ class Controller(object):
             zipfile.write(tmpfile, 'pressurize.json')
         return filename
 
-    def run_local(self, model_name, source_path=None, port='5000'):
+    def run_local(self, model_name, source_path=None, port='5000', docker=True):
         source_path = source_path or os.getcwd()
 
         local_path = os.path.join("/tmp/", "pressurize_local_"+model_name+str(random.randint(0, 10000)))
@@ -168,10 +169,30 @@ class Controller(object):
         with open(os.path.join(local_path, "pressurize.json"), 'w') as f:
             json.dump(custom_config, f)
 
-        spec = importlib.util.spec_from_file_location("server", os.path.join(local_path, "server.py"))
-        server = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(server)
-        server.main(port=port)
+        # Load as module if docker is false
+        if docker == False:
+            print("Loading model as module")
+            spec = importlib.util.spec_from_file_location("server", os.path.join(local_path, "server.py"))
+            server = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(server)
+            server.main(port=port)
+            return
+
+        # Copy AWS Credentials
+        print("Loading model in docker container")
+        print("Expanded user", os.path.expanduser("~"))
+        shutil.copy2(os.path.join(os.path.expanduser("~"), ".aws/credentials"),
+                     os.path.join(local_path, "credentials"))
+
+        # Run the docker build script
+        cmd = " ".join(["/".join(__file__.split("/")[:-1] + ["model", "run_local.sh"]),
+                                       local_path,
+                                       model_name.lower(),
+                                       str(port)])
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                  stderr=subprocess.STDOUT, shell=True)
+        for line in p.stdout:
+            print(line.decode('utf-8').replace("\n", ""))
 
     def deploy_api(self, dry_run=False):
         """

@@ -41,7 +41,6 @@ class ModelServer(object):
                     self._pipe.send({"result": result})
                 except Exception as e:
                     self._pipe.send({"error": "Exception: "+str(e)})
-                    raise e
 
     @staticmethod
     def import_model(path, source_path):

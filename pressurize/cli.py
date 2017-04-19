@@ -134,7 +134,8 @@ def deploy_api(ctx, aws_profile):
 @click.pass_context
 @click.argument("model_name")
 @click.option("--port", default=5001)
-def local(ctx, model_name, port):
+@click.option("--docker/--no-docker", default=True)
+def local(ctx, model_name, port, docker):
     if ctx.obj['config_file'] not in os.listdir(ctx.obj['project_dir']):
         click.echo('No pressurize.json file found in directory')
         raise click.Abort()
@@ -147,7 +148,7 @@ def local(ctx, model_name, port):
     except Exception as e:
         click.echo('Error with config: %s' % e)
         raise click.Abort()
-    controller.run_local(model_name, port=port)
+    controller.run_local(model_name, port=port, docker=docker)
 
 @cli.command(name="dry-run")
 @click.pass_context
