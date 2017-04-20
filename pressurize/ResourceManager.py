@@ -30,23 +30,23 @@ class ResourceManager(object):
         """
         Create default DynamoDB tables
         """
-        model_instance_state_config = {
+        cache_config = {
             "key_schema": OrderedDict([
-                ('model_name', 'HASH'),
-                ('server_address', 'RANGE'),
+                ('key', 'HASH'),
             ]),
             "attribute_definitions": {
-                'model_name': 'S',
-                'server_address': 'S',
+                'key': 'S'
             }
         }
-        model_instance_state_table = r.DynamoDBTableResource(
-            context, self.prefix_name("model_instance_state"),
-            attribute_definitions=model_instance_state_config['attribute_definitions'],
-            key_schema=model_instance_state_config['key_schema'],
+        self.cache_table = r.DynamoDBTableResource(
+            context, self.prefix_name("cache"),
+            attribute_definitions=cache_config['attribute_definitions'],
+            key_schema=cache_config['key_schema'],
             write_units=5, read_units=5
         )
-        return [model_instance_state_table]
+        print("DynamoDB table cache name", self.prefix_name("cache"))
+
+        return [self.cache_table]
 
     def bucket_resources(self, context, model):
         """
@@ -82,6 +82,8 @@ class ResourceManager(object):
         context = AWSContext(aws_region=self._controller.config['aws_region'])
         app = ElasticBeanstalkAppResource(context, self.prefix_name("api"))
         cname_prefix = self.cname_prefix("api")
+        table_resources = self.default_dynamo_tables(context)
+        permission_resources = list(map(lambda x: r.ReadWritePermission(x), table_resources))
         version = ElasticBeanstalkAppVersionResource(
             context,
             app,
@@ -93,7 +95,9 @@ class ResourceManager(object):
             app,
             config_options,
             solution_stacks["docker"],
-            "Pressurize API beanstalk config")
+            "Pressurize API beanstalk config",
+            permission_resources=permission_resources
+        )
         env = ElasticBeanstalkEnvResource(
             context,
             app,
@@ -102,7 +106,7 @@ class ResourceManager(object):
             cname_prefix,
             "Pressurize API env"
         )
-        return [app, version, config, env]
+        return [app, version, config, env] + table_resources
 
     def elastic_beanstalk_model_resources(self, name, version, source_file, config_options):
         """
@@ -113,6 +117,7 @@ class ResourceManager(object):
         cname_prefix = self.cname_prefix(name)
         model_config = self._controller.models[name]
         bucket_resources = self.bucket_resources(context, model_config)
+
         permission_resources = list(map(lambda x: r.ReadWritePermission(x), bucket_resources))
         version = ElasticBeanstalkAppVersionResource(
             context,

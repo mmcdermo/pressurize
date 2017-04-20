@@ -4,10 +4,10 @@
     "models": [
 	{
 	    "name": "TestModel",
-	    "path": "TestModel.TestModel",
+	    "path": "models.TestModel.TestModel",
 	    "methods": ["predict"],
 	    "required_resources": {
-		"parameters": "s3://pressurizetest-parameters/TestModel/parameters.txt"
+		"parameters": "s3://sick-beats/test_data.txt"
 	    }
 	}
     ]

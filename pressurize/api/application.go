@@ -10,7 +10,9 @@ import (
 	"io/ioutil"
 	"errors"
 	"regexp"
+	"strings"
 	"github.com/gorilla/mux"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
 type Model struct {
@@ -31,7 +33,11 @@ type PressurizeConfig struct {
 var (
 	config *PressurizeConfig
 	models map[string]Model
+	cache_db *dynamodb.DynamoDB
+	cache_table_name string
+	model_host string
 )
+
 
 func ValidModelMethod(model_name string, method_name string) error {
 	model, ok := models[model_name]
@@ -61,6 +67,9 @@ func Sanitize(name string) string {
 }
 
 func GetModelURL(model_name string) string {
+	if model_host != "" {
+		return model_host
+	}
 	return "http://" + Sanitize(config.DeploymentName) + "-" + model_name + "." +
 		config.AWSRegion + ".elasticbeanstalk.com"
 }
@@ -76,6 +85,14 @@ func ModelInstanceRequest(model_name string, method_name string, data interface{
 	return result, err
 }
 
+func CacheBody(body map[string]interface{}) (res []byte, err error){
+	exclude := []string{"user_id"}
+	for _, s := range exclude {
+		delete(body, s)
+	}
+	res, err = json.Marshal(body)
+	return
+}
 func ModelMethodHandler(w http.ResponseWriter, r *http.Request){
 	vars := mux.Vars(r)
 	log.Println("Model method handler")
@@ -89,7 +106,6 @@ func ModelMethodHandler(w http.ResponseWriter, r *http.Request){
 
 	defer r.Body.Close()
 	body, err := ioutil.ReadAll(r.Body)
-
 	parsed := make(map[string]interface{})
 	err = json.Unmarshal(body, &parsed)
 	if err != nil {
@@ -98,6 +114,27 @@ func ModelMethodHandler(w http.ResponseWriter, r *http.Request){
 		SendResponse(w, 400, m)
 		return
 	}
+
+	cache_body, err := CacheBody(parsed)
+	if err != nil {
+		m := map[string]string{"error": err.Error()}
+		SendResponse(w, 500, m)
+		return
+	}
+	cache_result, time, err := TryRequestCache(vars["model"], vars["method"], cache_body)
+	if err == nil {
+		log.Println("Returning cached response for "+ vars["model"] + "/" + vars["method"])
+		m := map[string]interface{}{
+			"model": vars["model"],
+			"method": vars["method"],
+			"from_cache": true,
+			"cache_time": time,
+			"result": cache_result,
+		}
+		SendResponse(w, 200, m)
+		return
+	}
+
 
 	response, err := ModelInstanceRequest(vars["model"], vars["method"], parsed)
 	if err != nil {
@@ -127,6 +164,7 @@ func ModelMethodHandler(w http.ResponseWriter, r *http.Request){
 		"cache_time": -1,
 		"result": result,
 	}
+	_ = PutRequestCache(vars["model"], vars["method"], cache_body, result)
 	SendResponse(w, 200, m)
 	return
 }
@@ -151,8 +189,14 @@ func loadConfig(path string){
 	}
 }
 
-func RunServer(path string, port string){
+func RunServer(path string, port string, _model_host string){
 	loadConfig(path)
+	if _model_host != "" {
+		model_host = _model_host
+	}
+	cache_table_name = strings.Replace(config.DeploymentName, "-", "_", -1) + "cache"
+	cache_db = CacheConnect(cache_table_name)
+
 	log.Println("Loaded config from " + path)
 	r := mux.NewRouter()
 	r.HandleFunc("/api/models/{model:[A-Za-z0-9_-]+}/{method:[A-Za-z0-9_-]+}/", ModelMethodHandler)
@@ -162,5 +206,5 @@ func RunServer(path string, port string){
 }
 
 func main() {
-	RunServer("./pressurize.json", "5000")
+	RunServer("./pressurize.json", "5000", "")
 }
