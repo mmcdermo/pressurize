@@ -86,11 +86,15 @@ func ModelInstanceRequest(model_name string, method_name string, data interface{
 }
 
 func CacheBody(body map[string]interface{}) (res []byte, err error){
-	exclude := []string{"user_id"}
-	for _, s := range exclude {
-		delete(body, s)
+	exclude := map[string]bool{"user_id": true}
+
+	cleaned := make(map[string]interface{}, 0)
+	for k, v := range body {
+		if _, ok := exclude[k]; !ok {
+			cleaned[k] = v
+		}
 	}
-	res, err = json.Marshal(body)
+	res, err = json.Marshal(cleaned)
 	return
 }
 func ModelMethodHandler(w http.ResponseWriter, r *http.Request){
