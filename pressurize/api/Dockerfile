@@ -1,4 +1,4 @@
-FROM golang:1.4.2
+FROM golang:1.7.5
 
 COPY ./ /go/src/app
 RUN cd /go/src/app && go get ./
