@@ -22,6 +22,7 @@ type Model struct {
 	RequiredResources map[string]string `json:"required_resources, omitempty"`
 	MinECUPerInstance []string `json:"min_ecu_per_instance,omitempty"`
 	MinMemoryPerInstance []string `json:"min_memory_per_instance,omitempty"`
+	CacheLifetime *int `json:"cache_lifetime,omitempty"`
 }
 
 type PressurizeConfig struct {
@@ -33,9 +34,11 @@ type PressurizeConfig struct {
 var (
 	config *PressurizeConfig
 	models map[string]Model
-	cache_db *dynamodb.DynamoDB
-	cache_table_name string
 	model_host string
+	ddb *dynamodb.DynamoDB
+	cache_table_name string
+	auth_table_name string
+	cached_auth_tokens map[string]AuthToken
 )
 
 
@@ -86,7 +89,11 @@ func ModelInstanceRequest(model_name string, method_name string, data interface{
 }
 
 func CacheBody(body map[string]interface{}) (res []byte, err error){
-	exclude := map[string]bool{"user_id": true}
+	exclude := map[string]bool{
+		"user_id": true,
+		"auth_token": true,
+		"auth_secret": true,
+	}
 
 	cleaned := make(map[string]interface{}, 0)
 	for k, v := range body {
@@ -97,6 +104,22 @@ func CacheBody(body map[string]interface{}) (res []byte, err error){
 	res, err = json.Marshal(cleaned)
 	return
 }
+
+
+func Authenticate(body map[string]interface{}) (authed bool, err error){
+	key, ok := body["auth_token_key"]
+	if !ok {
+		return false, errors.New("No authentication token provided")
+	}
+	secret, ok := body["auth_secret"]
+	if !ok {
+		return false, errors.New("No authentication secret provided")
+	}
+	authed, err = CheckAuth(key.(string), secret.(string))
+	return authed, err
+}
+
+
 func ModelMethodHandler(w http.ResponseWriter, r *http.Request){
 	vars := mux.Vars(r)
 	log.Println("Model method handler")
@@ -119,6 +142,18 @@ func ModelMethodHandler(w http.ResponseWriter, r *http.Request){
 		return
 	}
 
+	authed, err := Authenticate(parsed)
+	if err != nil {
+		m := map[string]string{"error": err.Error()}
+		SendResponse(w, 500, m)
+		return
+	}
+	if !authed {
+		m := map[string]string{"error": "Invalid authentication token."}
+		SendResponse(w, 403, m)
+		return
+	}
+
 	cache_body, err := CacheBody(parsed)
 	if err != nil {
 		m := map[string]string{"error": err.Error()}
@@ -138,7 +173,6 @@ func ModelMethodHandler(w http.ResponseWriter, r *http.Request){
 		SendResponse(w, 200, m)
 		return
 	}
-
 
 	response, err := ModelInstanceRequest(vars["model"], vars["method"], parsed)
 	if err != nil {
@@ -168,7 +202,14 @@ func ModelMethodHandler(w http.ResponseWriter, r *http.Request){
 		"cache_time": -1,
 		"result": result,
 	}
-	_ = PutRequestCache(vars["model"], vars["method"], cache_body, result)
+
+	model_config := models[vars["model"]]
+	lifetime := model_config.CacheLifetime
+	if lifetime == nil {
+		a := 60 * 60 * 24
+		lifetime = &a
+	}
+	_ = PutRequestCache(vars["model"], vars["method"], cache_body, *lifetime, result)
 	SendResponse(w, 200, m)
 	return
 }
@@ -199,7 +240,8 @@ func RunServer(path string, port string, _model_host string){
 		model_host = _model_host
 	}
 	cache_table_name = strings.Replace(config.DeploymentName, "-", "_", -1) + "cache"
-	cache_db = CacheConnect(cache_table_name)
+	auth_table_name = strings.Replace(config.DeploymentName, "-", "_", -1) + "auth"
+	ddb = ConnectDynamo("us-west-2")
 
 	log.Println("Loaded config from " + path)
 	r := mux.NewRouter()

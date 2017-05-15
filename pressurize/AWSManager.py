@@ -16,10 +16,12 @@ class AWSManager(object):
     def create_session(self):
         if self._session is None:
             try:
+                print("Creating AWS Session with profile %s" % self._aws_profile)
                 self._session = boto3.Session(profile_name=self._aws_profile,
                                               region_name=self._aws_region
                 )
             except botocore.exceptions.ProfileNotFound:
+                print("Profile not found. Attempting to utilize provided keys")
                 self._session = boto3.Session(
                     region_name=self._aws_region,
                     aws_access_key_id=self._aws_access_key_id,

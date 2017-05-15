@@ -18,7 +18,14 @@ class ResourceManager(object):
     """
     def __init__(self, controller):
         self._controller = controller
+
+        # Our AWSManager
         self._aws_manager = self._controller._aws_manager
+
+        # RedLeader AWSContext
+        self._aws_context = AWSContext(
+            aws_profile = self._controller._aws_profile,
+            aws_region=self._controller.config['aws_region'])
 
     def _cluster_name(self):
         return self._controller.config["deployment_name"] + "Cluster"
@@ -44,9 +51,25 @@ class ResourceManager(object):
             key_schema=cache_config['key_schema'],
             write_units=5, read_units=5
         )
-        print("DynamoDB table cache name", self.prefix_name("cache"))
+        print("DynamoDB cache table name", self.prefix_name("cache"))
 
-        return [self.cache_table]
+        auth_config = {
+            "key_schema": OrderedDict([
+                ('token_key', 'HASH'),
+            ]),
+            "attribute_definitions": {
+                'token_key': 'S'
+            }
+        }
+        self.auth_table = r.DynamoDBTableResource(
+            context, self.prefix_name("auth"),
+            attribute_definitions=auth_config['attribute_definitions'],
+            key_schema=auth_config['key_schema'],
+            write_units=5, read_units=5
+        )
+        print("DynamoDB auth table name", self.prefix_name("cache"))
+
+        return [self.cache_table, self.auth_table]
 
     def bucket_resources(self, context, model):
         """
@@ -79,7 +102,7 @@ class ResourceManager(object):
         """
         Create RedLeader resources for the API elastic beanstalk deployment
         """
-        context = AWSContext(aws_region=self._controller.config['aws_region'])
+        context = self._aws_context
         app = ElasticBeanstalkAppResource(context, self.prefix_name("api"))
         cname_prefix = self.cname_prefix("api")
         table_resources = self.default_dynamo_tables(context)
@@ -112,7 +135,7 @@ class ResourceManager(object):
         """
         Create RedLeader resources for a single elastic beanstalk model deployment
         """
-        context = AWSContext(aws_region=self._controller.config['aws_region'])
+        context = self._aws_context
         app = ElasticBeanstalkAppResource(context, self.prefix_name(sanitize(name)))
         cname_prefix = self.cname_prefix(name)
         model_config = self._controller.models[name]
@@ -152,8 +175,7 @@ class ResourceManager(object):
         2)  Defaults to t2.micro
         """
 
-        context = AWSContext(aws_region=self._controller.config['aws_region'])
-        cluster = Cluster(sanitize(self._cluster_name() + "api"), context)
+        cluster = Cluster(sanitize(self._cluster_name() + "api"), self._aws_context)
         version = str(random.randint(0, 100000))
 
         conf = self._controller.config
@@ -230,8 +252,7 @@ class ResourceManager(object):
          3)  Defaults to t2.micro
         """
 
-        context = AWSContext(aws_region=self._controller.config['aws_region'])
-        cluster = Cluster(sanitize(self._cluster_name() + model_name), context)
+        cluster = Cluster(sanitize(self._cluster_name() + model_name), self._aws_context)
         version = str(random.randint(0, 100000))
 
         model_config = self._controller.models[model_name]
@@ -282,8 +303,7 @@ class ResourceManager(object):
 
         Not currently used.
         """
-        context = AWSContext()
-        cluster = Cluster(self._cluster_name(), context)
+        cluster = Cluster(self._cluster_name(), self._aws_context)
 
         # Create a ref to cloudwatch logs so we can create an appropriate role
         logs = r.CloudWatchLogs(context)

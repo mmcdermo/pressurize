@@ -10,6 +10,8 @@ import os.path
 import json
 import time
 import datetime
+import hashlib
+import string
 from zipfile import ZipFile
 from threading import Thread
 import importlib.util
@@ -25,7 +27,7 @@ import pressurize.AWSManager as AWSManager
 
 
 class Controller(object):
-    def __init__(self, config):
+    def __init__(self, config, aws_profile=None):
         self._defaults = {
         }
         self.validate_config(config)
@@ -41,8 +43,8 @@ class Controller(object):
             if key not in config:
                 setattr(self, key, self._defaults[key])
 
-        self._aws_manager = AWSManager.AWSManager()
-
+        self._aws_profile = aws_profile
+        self._aws_manager = AWSManager.AWSManager(aws_profile=aws_profile)
         self._resource_manager = ResourceManager.ResourceManager(self)
 
     def create_resources(self, force_update=False):
@@ -260,6 +262,27 @@ class Controller(object):
         cluster = self._resource_manager.create_api_cluster(filename)
         cluster.blocking_delete(verbose=True)
         print("Destroyed API cluster")
+
+    def create_token(self, token_lifetime_in_hours):
+        chars = (string.ascii_letters + string.digits + '!@#$%^&*()')[:64]
+        token_key = "".join([chars[os.urandom(1)[0] % len(chars)] for x in range(32)])
+        secret = "".join([chars[os.urandom(1)[0] % len(chars)] for x in range(32)])
+
+        ddb = self._aws_manager.get_client('dynamodb')
+        expires = int(time.time() + token_lifetime_in_hours * 60 * 60)
+        res = ddb.put_item(
+            TableName=self._resource_manager.prefix_name("auth"),
+            Item={
+                "token_key": {"S": token_key},
+                "secret": {"S": secret},
+                "expires": {"N": str(expires)}
+            }
+        )
+        return {
+            "token_key": token_key,
+            "secret": secret,
+            "expires": expires
+        }
 
     def destroy_model_cluster(self, model_name):
         """

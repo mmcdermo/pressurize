@@ -10,10 +10,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	"log"
 )
 
-func CacheConnect(region string) (*dynamodb.DynamoDB) {
+func ConnectDynamo(region string) (*dynamodb.DynamoDB) {
 	awscfg := &aws.Config{}
 	awscfg.WithRegion("us-west-2")
 
@@ -24,7 +25,7 @@ func CacheConnect(region string) (*dynamodb.DynamoDB) {
 	return dynamodb.New(sess)
 }
 
-func CachePut(db *dynamodb.DynamoDB, table_name string, key string, value string) (err error) {
+func CachePut(db *dynamodb.DynamoDB, table_name string, key string, value string, lifetime int) (err error) {
 	var input = &dynamodb.PutItemInput{
 		Item: map[string]*dynamodb.AttributeValue{
 			"key": {
@@ -36,6 +37,9 @@ func CachePut(db *dynamodb.DynamoDB, table_name string, key string, value string
 			"creation_time": {
 				N: aws.String(strconv.Itoa(int(time.Now().Unix()))),
 			},
+			"expires": {
+				N: aws.String(strconv.Itoa(int(time.Now().Unix()) + lifetime)),
+			},
 
 		},
 		TableName: aws.String(table_name),
@@ -44,7 +48,7 @@ func CachePut(db *dynamodb.DynamoDB, table_name string, key string, value string
 	return
 }
 
-func CacheGet(db *dynamodb.DynamoDB, table_name string, key string) (result string, creation_time int, err error) {
+func CacheGet(db *dynamodb.DynamoDB, table_name string, key string) (result string, creation_time int, expires int, err error) {
 	var input = &dynamodb.GetItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
 			"key": {
@@ -60,21 +64,23 @@ func CacheGet(db *dynamodb.DynamoDB, table_name string, key string) (result stri
 		if _, ok := output.Item["creation_time"]; ok {
 			dynamodbattribute.Unmarshal(output.Item["creation_time"], &creation_time)
 		}
+		if _, ok := output.Item["expires"]; ok {
+			dynamodbattribute.Unmarshal(output.Item["expires"], &expires)
+		}
 	}
 	return
 }
 
 func TryRequestCache(model string, method string, body []byte) (res map[string]interface{}, cache_time int, err error){
 	key := CacheKey(model, method, body)
-	resp, t, err := CacheGet(cache_db, cache_table_name, key)
-	log.Println("Try request cache " + key)
+	resp, t, expires, err := CacheGet(ddb, cache_table_name, key)
 	if err != nil {
 		return nil, t, err
 	}
+	if expires < int(time.Now().Unix()) {
+		return nil, t, errors.New("Cache entry expired")
+	}
 	err = json.Unmarshal([]byte(resp), &res)
-	log.Println("Try request cache 2")
-	log.Println(string(resp))
-	log.Println(res, err)
 	if err != nil {
 		return nil, t, err
 	}
@@ -85,16 +91,12 @@ func CacheKey(model string, method string, body []byte) string{
 	hasher := md5.New()
 	hasher.Write(body)
 	hash := hex.EncodeToString(hasher.Sum(nil))
-	log.Println("Generating cache key " + model + method + hash)
 	return model + method + hash
 }
-func PutRequestCache(model string, method string, body []byte, response interface{}) error {
+func PutRequestCache(model string, method string, body []byte, lifetime int, response interface{}) error {
 	j,_ := json.Marshal(response)
 	key := CacheKey(model, method, body)
-	log.Println("Put request cache " + key)
-	log.Println("Put request with string " + string(j))
-	log.Println(cache_db, cache_table_name)
-	res := CachePut(cache_db, cache_table_name, key, string(j))
+	res := CachePut(ddb, cache_table_name, key, string(j), lifetime)
 	log.Println(res)
 	return res
 }
