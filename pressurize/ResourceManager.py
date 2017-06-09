@@ -198,6 +198,11 @@ class ResourceManager(object):
             },
             "aws:elasticbeanstalk:environment": {
                 "EnvironmentType": "LoadBalanced"
+            },
+            "aws:elasticbeanstalk:cloudwatch:logs": {
+                "StreamLogs": True,
+                "DeleteOnTerminate": False,
+                "RetentionInDays": 30
             }
         }
         resources = self.elastic_beanstalk_api_resources(version,
@@ -286,6 +291,11 @@ class ResourceManager(object):
             },
             "aws:elasticbeanstalk:environment": {
                 "EnvironmentType": "LoadBalanced"
+            },
+            "aws:elasticbeanstalk:cloudwatch:logs": {
+                "StreamLogs": True,
+                "DeleteOnTerminate": False,
+                "RetentionInDays": 30
             }
         }
         resources = self.elastic_beanstalk_model_resources(model_name,

@@ -8,16 +8,19 @@
  process. Access to the server side of the pipe is guarded by a Lock from multiprocessing.
 """
 
-from flask import Flask, jsonify, request, abort, make_response
-import json
+
 from multiprocessing import Queue, Process, Pipe, Lock
 import multiprocessing
 import queue as Q
 import random
-import tensorflow as tf
 import os.path
+import json
 import os
 import importlib
+
+from flask import Flask, jsonify, request, abort, make_response
+from flask_cors import CORS, cross_origin
+import tensorflow as tf
 import boto3
 import botocore
 
@@ -67,7 +70,7 @@ class ModelServer(object):
             print("Downloading resource %s from %s" % (resource_name, s3_path))
             parts = s3_path.split("/")
             if len(parts) < 4:
-                raise RuntimeError("Invalid s3 resource in config: " + resource)
+                raise RuntimeError("Invalid s3 resource in config: " + resource_name)
 
             bucket = parts[2] # s3://{bucket}
             key = "/".join(parts[3:]) # s3://{bucket}/{key/with/slashes}
@@ -83,15 +86,15 @@ class ModelServer(object):
             try:
                 client.download_file(bucket, key, local_path)
             except botocore.exceptions.ClientError as e:
-                print("Failed to download resource '%s' @ %s: %s" % \
+                raise RuntimeError("Failed to download resource '%s' @ %s: %s" % \
                       (resource_name, s3_path, str(e)))
-                exit(1)
             resources[resource_name] = local_path
         return resources
 
 serverPipeLock = Lock()
 pipes = {}
 app = Flask(__name__)
+CORS(app)
 
 @app.route('/api/<string:model>/<string:method>/', methods=['POST'])
 def executeModelMethod(model, method):
