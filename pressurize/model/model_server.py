@@ -9,7 +9,9 @@
 """
 
 
-from multiprocessing import Queue, Process, Pipe, Lock
+from multiprocessing import Queue, Process, Pipe, Lock, log_to_stderr
+import logging
+
 import multiprocessing
 import queue as Q
 import random
@@ -33,17 +35,25 @@ class ModelServer(object):
         self._model = self._model_class(self._resources)
 
     def run(self):
-        with self._model.modelcontext():
-            while True:
-                item = self._pipe.recv()
-                if not hasattr(self._model, item['method']):
-                    self._pipe.send({"error": "Model does not have method %s" % item['method']})
-                try:
-                    preprocessed = self._model.preprocess(item["data"])
-                    result = getattr(self._model, item['method'])(preprocessed)
-                    self._pipe.send({"result": result})
-                except Exception as e:
-                    self._pipe.send({"error": "Exception: "+str(e)})
+        logger = multiprocessing.log_to_stderr()
+        logger.setLevel(logging.INFO)
+        logger.info('About to enter model processing loop')
+        try:
+            with self._model.modelcontext():
+                while True:
+                    item = self._pipe.recv()
+                    if not hasattr(self._model, item['method']):
+                        self._pipe.send({"error": "Model does not have method %s" % item['method']})
+                    try:
+                        preprocessed = self._model.preprocess(item["data"])
+                        result = getattr(self._model, item['method'])(preprocessed)
+                        self._pipe.send({"result": result})
+                    except Exception as e:
+                        self._pipe.send({"error": "Exception: "+str(e)})
+                        logger.exception("Encountered error during invocation of method %s: %s" %
+                                     (item['method'], str(e)))
+        except Exception as e:
+            logger.exception("Unexpected error encountered during model setup or request processing.")
 
     @staticmethod
     def import_model(path, source_path):
