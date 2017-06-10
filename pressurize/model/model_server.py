@@ -19,7 +19,6 @@ import random
 import os.path
 import json
 import os
-import os.environ
 import importlib
 
 from flask import Flask, jsonify, request, abort, make_response
