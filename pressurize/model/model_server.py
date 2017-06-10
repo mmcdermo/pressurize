@@ -11,6 +11,7 @@
 
 from multiprocessing import Queue, Process, Pipe, Lock, log_to_stderr
 import logging
+import logging.handlers
 
 import multiprocessing
 import queue as Q
@@ -18,6 +19,7 @@ import random
 import os.path
 import json
 import os
+import os.environ
 import importlib
 
 from flask import Flask, jsonify, request, abort, make_response
@@ -35,8 +37,15 @@ class ModelServer(object):
         self._model = self._model_class(self._resources)
 
     def run(self):
-        logger = multiprocessing.log_to_stderr()
-        logger.setLevel(logging.INFO)
+        handler = logging.handlers.WatchedFileHandler(
+            os.environ.get("PRESSURIZE_LOGFILE", "/var/log/pressurize.log"))
+        formatter = logging.Formatter(logging.BASIC_FORMAT)
+        handler.setFormatter(formatter)
+        logger = logging.getLogger()
+        logger.setLevel(os.environ.get("LOGLEVEL", "INFO"))
+        logger.addHandler(handler)
+
+        #logger = multiprocessing.log_to_stderr()
         logger.info('About to enter model processing loop')
         try:
             with self._model.modelcontext():
@@ -49,7 +58,7 @@ class ModelServer(object):
                         result = getattr(self._model, item['method'])(preprocessed)
                         self._pipe.send({"result": result})
                     except Exception as e:
-                        self._pipe.send({"error": "Exception: "+str(e)})
+                        self._pipe.send({"error": "Exception: " + str(e)})
                         logger.exception("Encountered error during invocation of method %s: %s" %
                                      (item['method'], str(e)))
         except Exception as e:

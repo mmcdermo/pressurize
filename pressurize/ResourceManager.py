@@ -278,7 +278,8 @@ class ResourceManager(object):
                 "MaxSize": str(model_config.get('max_size', max_size))
             },
             "aws:autoscaling:launchconfiguration": {
-                "InstanceType": instance_type
+                "InstanceType": instance_type,
+                "RootVolumeSize": str(model_config.get('storage_gb', 16))
             },
             "aws:elasticbeanstalk:command": {
                 "DeploymentPolicy": "Immutable"
