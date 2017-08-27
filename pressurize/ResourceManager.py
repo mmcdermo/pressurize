@@ -78,6 +78,7 @@ class ResourceManager(object):
         appropriate IAM permissions
         """
         bucket_names = {}
+        dynamodb_table_names = {}
         for resource_name in model["required_resources"]:
             resource = model["required_resources"][resource_name]
             if("s3://" in resource):
@@ -85,12 +86,23 @@ class ResourceManager(object):
                 if len(parts) < 3:
                     raise RuntimeError("Invalid s3 url in configuration: %s" % resource)
                 bucket_names[parts[2]] = True
+            if("dynamodb://" in resource):
+                parts = resource.split("//")
+                if len(parts) < 2:
+                    raise RuntimeError("Invalid dynamodb table in configuration: %s" % resource)
+                dynamodb_table_names[parts[2]] = { "aws_region":
+                                                   context._aws_region if len(parts) < 3 else parts[1] }
 
         bucket_resources = []
         for bucket_name in bucket_names:
             bucket_resources.append(r.S3BucketResource(context, bucket_name))
 
-        return bucket_resources
+        table_resources = []
+        for table_name in dynamodb_table_names:
+            conf = dynamodb_table_names[table_name]
+            bucket_resources.append(r.DynamoDBTableResource(context, table_name, aws_region=conf['aws_region']))
+
+        return bucket_resources + table_resources
 
     def elastic_beanstalk_bucket(self):
         return "pressurizebucket" + sanitize(self._controller.config['deployment_name'])

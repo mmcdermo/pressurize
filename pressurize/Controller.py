@@ -61,7 +61,7 @@ class Controller(object):
     def validate_config(self, config):
         required_keys = ['deployment_name', 'aws_region', 'models']
         accepted_keys = required_keys + ['api_min_size', 'api_max_size',
-                                         'api_instance_type']
+                                         'api_instance_type', 'custom_parameters']
         for key in required_keys:
             if key not in config:
                 raise Exception('Config must have key %s' % key)

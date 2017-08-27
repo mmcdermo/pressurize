@@ -33,7 +33,7 @@ class ModelServer(object):
         self._pipe = pipe
         self._resources = ModelServer.acquire_resources(config, model_conf, resource_path)
         self._model_class = ModelServer.import_model(model_conf['path'], source_path)
-        self._model = self._model_class(self._resources)
+        self._model = self._model_class(self._resources, config=config)
 
     def run(self):
         handler = logging.handlers.WatchedFileHandler(
