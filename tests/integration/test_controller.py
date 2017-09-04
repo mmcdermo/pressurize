@@ -104,7 +104,7 @@ class TestController(unittest.TestCase):
         controller = Controller(self.config)
 
         # Create cluster if needed
-        perssurize.create_resources()
+        pressurize.create_resources()
 
         # Deploy API
         controller.deploy_api()

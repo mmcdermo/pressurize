@@ -79,7 +79,9 @@ class Controller(object):
                                 (model.get('name', 'unnamed'), key))
         accepted_keys = required_keys + ['min_size', 'max_size', 'instance_type',
                                          'required_memory', 'required_ecu',
-                                         'required_resources', 'storage_gb']
+                                         'required_resources', 'storage_gb',
+                                         'custom_parameters'
+        ]
         for key in model:
             if key not in accepted_keys:
                 raise Exception('Invalid key %s in model %s config' %

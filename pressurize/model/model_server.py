@@ -89,6 +89,8 @@ class ModelServer(object):
             parts = s3_path.split("/")
             if len(parts) < 4:
                 raise RuntimeError("Invalid s3 resource in config: " + resource_name)
+            if parts[0] != "s3:":
+                continue
 
             bucket = parts[2] # s3://{bucket}
             key = "/".join(parts[3:]) # s3://{bucket}/{key/with/slashes}

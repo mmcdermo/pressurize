@@ -100,6 +100,7 @@ class ResourceManager(object):
         table_resources = []
         for table_name in dynamodb_table_names:
             conf = dynamodb_table_names[table_name]
+            print("Creating resource ", table_name, conf['aws_region'])
             bucket_resources.append(r.DynamoDBTableResource(context, table_name, aws_region=conf['aws_region']))
 
         return bucket_resources + table_resources
