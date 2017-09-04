@@ -90,6 +90,7 @@ class ModelServer(object):
             if len(parts) < 4:
                 raise RuntimeError("Invalid s3 resource in config: " + resource_name)
             if parts[0] != "s3:":
+                resources[resource_name] = s3_path
                 continue
 
             bucket = parts[2] # s3://{bucket}
