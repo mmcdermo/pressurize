@@ -17,7 +17,7 @@ class TestModelServer(unittest.TestCase):
         pass
 
     def tearDown(self):
-        session = boto3.Session(profile_name="testing")
+        session = boto3.Session()
         client = session.client('s3')
         self.cleanup_buckets(client, "pressurizetest")
 
@@ -35,7 +35,7 @@ class TestModelServer(unittest.TestCase):
                 client.delete_bucket(Bucket=bucket['Name'])
 
     def upload_test_parameters(self, bucket_name):
-        session = boto3.Session(profile_name="testing")
+        session = boto3.Session()
         client = session.client('s3')
 
         try:
@@ -53,7 +53,7 @@ class TestModelServer(unittest.TestCase):
             config = json.load(f)
 
         # Configure downloadable resources
-        bucket_name = "pressurizetest%s" % random.randint(0, 1000000)
+        bucket_name = "testpressurize%s" % random.randint(0, 1000000000)
         resource_path = "s3://%s/TestModel/parameters.txt" % bucket_name
         config["models"][0]["required_resources"]["parameters"] = resource_path
         self.upload_test_parameters(bucket_name)

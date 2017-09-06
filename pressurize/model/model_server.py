@@ -36,7 +36,7 @@ class ModelServer(object):
         self._logger = self.setup_logging()
         self._model = self._model_class(self._resources, config=model_conf, logger=self._logger)
 
-    def setup_logging(self)
+    def setup_logging(self):
         handler = logging.handlers.WatchedFileHandler(
             os.environ.get("PRESSURIZE_LOGFILE", "/var/log/pressurize.log"))
         formatter = logging.Formatter(logging.BASIC_FORMAT)
