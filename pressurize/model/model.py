@@ -2,7 +2,7 @@ from contextlib import contextmanager
 import tensorflow as tf
 
 class PressurizeModel(object):
-    def __init__(self, resources, config=None):
+    def __init__(self, resources, config=None, logger=None):
         self.resources = resources
         self.config = config
 

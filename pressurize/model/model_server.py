@@ -33,9 +33,10 @@ class ModelServer(object):
         self._pipe = pipe
         self._resources = ModelServer.acquire_resources(config, model_conf, resource_path)
         self._model_class = ModelServer.import_model(model_conf['path'], source_path)
-        self._model = self._model_class(self._resources, config=model_conf)
+        self._logger = self.setup_logging()
+        self._model = self._model_class(self._resources, config=model_conf, logger=self._logger)
 
-    def run(self):
+    def setup_logging(self)
         handler = logging.handlers.WatchedFileHandler(
             os.environ.get("PRESSURIZE_LOGFILE", "/var/log/pressurize.log"))
         formatter = logging.Formatter(logging.BASIC_FORMAT)
@@ -43,9 +44,11 @@ class ModelServer(object):
         logger = logging.getLogger()
         logger.setLevel(os.environ.get("LOGLEVEL", "INFO"))
         logger.addHandler(handler)
+        return logger
 
+    def run(self):
         #logger = multiprocessing.log_to_stderr()
-        logger.info('About to enter model processing loop')
+        self._logger.info('About to enter model processing loop')
         try:
             with self._model.modelcontext():
                 while True:
@@ -58,10 +61,10 @@ class ModelServer(object):
                         self._pipe.send({"result": result})
                     except Exception as e:
                         self._pipe.send({"error": "Exception: " + str(e)})
-                        logger.exception("Encountered error during invocation of method %s: %s" %
+                        self._logger.exception("Encountered error during invocation of method %s: %s" %
                                      (item['method'], str(e)))
         except Exception as e:
-            logger.exception("Unexpected error encountered during model setup or request processing.")
+            self._logger.exception("Unexpected error encountered during model setup or request processing.")
 
     @staticmethod
     def import_model(path, source_path):
