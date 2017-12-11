@@ -20,6 +20,7 @@ import os.path
 import json
 import os
 import importlib
+import pkgutil
 
 from flask import Flask, jsonify, request, abort, make_response
 from flask_cors import CORS, cross_origin
@@ -167,4 +168,4 @@ def run_server(config, source_path=os.getcwd(), resource_path=os.getcwd(),
         serverProcess.start()
         return serverProcess
     else:
-        app.run(host='0.0.0.0', port=port, debug=debug)
+        app.run(host='0.0.0.0', port=int(port), debug=debug)

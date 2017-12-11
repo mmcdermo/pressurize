@@ -306,8 +306,11 @@ def copytree(src, dst, symlinks=False, ignore=None):
     for item in os.listdir(src):
         s = os.path.join(src, item)
         d = os.path.join(dst, item)
+        #if os.path.isdir("/" + "/".join(d.split("/")[:-1])):
+        #    shutil.copy2(s, d)
+        #    os.chmod(d, 644)
         if os.path.isdir(s):
-            shutil.copytree(s, d, symlinks, ignore)
+            copytree(s, d, symlinks, ignore)
         else:
             try:
                 os.makedirs("/" + "/".join(d.split("/")[:-1]))
