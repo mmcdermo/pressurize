@@ -9,7 +9,7 @@ install_requires = [
 
 setup(
     name='pressurize',
-    version='0.18',
+    version='0.20',
     description='Cloud Machine Learning Deployment',
     author='Morgan McDermott',
     author_email='morganmcdermott@gmail.com',
@@ -20,6 +20,11 @@ setup(
     keywords='',
     packages=find_packages(),
     install_requires=install_requires,
+    package_data={
+        'pressurize': [
+            '/pressurize/api/*'
+        ],
+    },
     entry_points={
         'console_scripts': [
             'pressurize = pressurize.cli:main',

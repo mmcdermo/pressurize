@@ -79,6 +79,7 @@ class ResourceManager(object):
         """
         bucket_names = {}
         dynamodb_table_names = {}
+        cloudsearch_configs = []
         for resource_name in model["required_resources"]:
             resource = model["required_resources"][resource_name]
             if("s3://" in resource):
@@ -92,6 +93,10 @@ class ResourceManager(object):
                     raise RuntimeError("Invalid dynamodb table in configuration: %s" % resource)
                 dynamodb_table_names[parts[2]] = { "aws_region":
                                                    context._aws_region if len(parts) < 3 else parts[1] }
+            if("cloudsearch://" in resource):
+                cloudsearch_configs = cloudsearch_configs.append(
+                    model["required_resources"][resource_name]
+                )
 
         bucket_resources = []
         for bucket_name in bucket_names:
@@ -103,7 +108,13 @@ class ResourceManager(object):
             print("Creating resource ", table_name, conf['aws_region'])
             bucket_resources.append(r.DynamoDBTableResource(context, table_name, aws_region=conf['aws_region']))
 
-        return bucket_resources + table_resources
+        cloudsearch_resources = []
+        for item in cloudsearch_configs:
+            cloudsearch_resources.append(CloudSearch(
+                domain_name=item['domain_name']
+            ))
+
+        return bucket_resources + table_resources + cloudsearch_configs
 
     def elastic_beanstalk_bucket(self):
         return "pressurizebucket" + sanitize(self._controller.config['deployment_name'])
