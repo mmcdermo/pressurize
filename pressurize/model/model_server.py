@@ -90,7 +90,7 @@ class ModelServer(object):
         for resource_name in model['required_resources']:
             s3_path = model['required_resources'][resource_name]
             print("Downloading resource %s from %s" % (resource_name, s3_path))
-            if not isinstance(s3_path, basestring):
+            if not isinstance(s3_path, str):
                 continue
             parts = s3_path.split("/")
             if len(parts) < 4:
