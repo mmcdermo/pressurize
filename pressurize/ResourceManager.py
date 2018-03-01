@@ -71,9 +71,9 @@ class ResourceManager(object):
 
         return [self.cache_table, self.auth_table]
 
-    def bucket_resources(self, context, model):
+    def model_resources(self, context, model):
         """
-        Create RedLeader bucket resources for any referenced buckets,
+        Create RedLeader resources for any referenced AWS resources
         so that our deployed elastic beanstalk applications can be granted
         appropriate IAM permissions
         """
@@ -93,10 +93,9 @@ class ResourceManager(object):
                     raise RuntimeError("Invalid dynamodb table in configuration: %s" % resource)
                 dynamodb_table_names[parts[2]] = { "aws_region":
                                                    context._aws_region if len(parts) < 3 else parts[1] }
-            if("cloudsearch://" in resource):
-                cloudsearch_configs = cloudsearch_configs.append(
-                    model["required_resources"][resource_name]
-                )
+            if("cloudsearch://" in resource_name):
+                print("Discovered cloudsearch config", resource)
+                cloudsearch_configs.append(resource)
 
         bucket_resources = []
         for bucket_name in bucket_names:
@@ -110,11 +109,14 @@ class ResourceManager(object):
 
         cloudsearch_resources = []
         for item in cloudsearch_configs:
-            cloudsearch_resources.append(CloudSearch(
-                domain_name=item['domain_name']
-            ))
+            cloudsearch_resources.append(
+                r.CloudSearch(
+                    context,
+                    domain_name=item['domain_name']))
+            print("Creating cloudsearch resource for domain", item['domain_name'])
+            print(cloudsearch_resources[0])
 
-        return bucket_resources + table_resources + cloudsearch_configs
+        return bucket_resources + table_resources + cloudsearch_resources
 
     def elastic_beanstalk_bucket(self):
         return "pressurizebucket" + sanitize(self._controller.config['deployment_name'])
@@ -163,9 +165,8 @@ class ResourceManager(object):
         app = ElasticBeanstalkAppResource(context, self.prefix_name(sanitize(name)))
         cname_prefix = self.cname_prefix(name)
         model_config = self._controller.models[name]
-        bucket_resources = self.bucket_resources(context, model_config)
-
-        permission_resources = list(map(lambda x: r.ReadWritePermission(x), bucket_resources))
+        model_resources = self.model_resources(context, model_config)
+        permission_resources = list(map(lambda x: r.ReadWritePermission(x), model_resources))
         version = ElasticBeanstalkAppVersionResource(
             context,
             app,
@@ -188,7 +189,7 @@ class ResourceManager(object):
             cname_prefix,
             "Pressurize env %s" % name
         )
-        return [app, version, config, env] + bucket_resources
+        return [app, version, config, env] + model_resources
 
     def create_api_cluster(self, source_file, min_size=1, max_size=2):
         """

@@ -138,6 +138,15 @@ def executeModelMethod(model, method):
     resId = str(random.random())
     serverPipeLock.acquire()
     serverPipe = pipes[model][0]
+
+    # Drain pipe in the event there was an error
+    while serverPipe.poll():
+        try:
+            res = serverPipe.recv()
+            print("Drained failed event", str(res))
+        except EOFError:
+            continue
+
     serverPipe.send({
         "model": model,
         "method": method,

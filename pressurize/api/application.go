@@ -19,7 +19,7 @@ type Model struct {
 	Path string `json:"path"`
 	Name string `json:"name"`
 	Methods []string `json:"methods"`
-	RequiredResources map[string]string `json:"required_resources, omitempty"`
+	RequiredResources map[string]interface{} `json:"required_resources, omitempty"`
 	MinECUPerInstance []string `json:"min_ecu_per_instance,omitempty"`
 	MinMemoryPerInstance []string `json:"min_memory_per_instance,omitempty"`
 	CacheLifetime *int `json:"cache_lifetime,omitempty"`
@@ -154,24 +154,32 @@ func ModelMethodHandler(w http.ResponseWriter, r *http.Request){
 		return
 	}
 
-	cache_body, err := CacheBody(parsed)
-	if err != nil {
-		m := map[string]string{"error": err.Error()}
-		SendResponse(w, 500, m)
-		return
+	no_cache := false
+	if _, ok := parsed["no_cache"]; ok {
+		no_cache = true
 	}
-	cache_result, time, err := TryRequestCache(vars["model"], vars["method"], cache_body)
-	if err == nil {
-		log.Println("Returning cached response for "+ vars["model"] + "/" + vars["method"])
-		m := map[string]interface{}{
-			"model": vars["model"],
-			"method": vars["method"],
-			"from_cache": true,
-			"cache_time": time,
-			"result": cache_result,
+
+	var cache_body []byte
+	if true || !no_cache {
+		cache_body, err := CacheBody(parsed)
+		if err != nil {
+			m := map[string]string{"error": err.Error()}
+			SendResponse(w, 500, m)
+			return
 		}
-		SendResponse(w, 200, m)
-		return
+		cache_result, time, err := TryRequestCache(vars["model"], vars["method"], cache_body)
+		if err == nil {
+			log.Println("Returning cached response for "+ vars["model"] + "/" + vars["method"])
+			m := map[string]interface{}{
+				"model": vars["model"],
+				"method": vars["method"],
+				"from_cache": true,
+				"cache_time": time,
+				"result": cache_result,
+			}
+			SendResponse(w, 200, m)
+			return
+		}
 	}
 
 	response, err := ModelInstanceRequest(vars["model"], vars["method"], parsed)
@@ -209,7 +217,9 @@ func ModelMethodHandler(w http.ResponseWriter, r *http.Request){
 		a := 60 * 60 * 24
 		lifetime = &a
 	}
-	_ = PutRequestCache(vars["model"], vars["method"], cache_body, *lifetime, result)
+	if true || !no_cache {
+		_ = PutRequestCache(vars["model"], vars["method"], cache_body, *lifetime, result)
+	}
 	SendResponse(w, 200, m)
 	return
 }
