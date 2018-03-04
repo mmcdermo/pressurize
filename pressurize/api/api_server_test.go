@@ -3,6 +3,7 @@ package main
 import (
 	"testing"
 	"time"
+	"math/rand"
 )
 
 
@@ -84,9 +85,10 @@ func TestServer(t *testing.T){
 	if err != nil {
 		t.Fatal(err)
 	}
+	test_rand := rand.Int()
 	payload := map[string]interface{}{
 		"user_id": interface{}("2"),
-		"data": interface{}(map[string]int{ "number": 42 }),
+		"data": interface{}(map[string]int{ "number": test_rand }),
 		"auth_token_key": "test_token2",
 		"auth_secret": "mysecret",
 	}
@@ -97,27 +99,37 @@ func TestServer(t *testing.T){
 		t.Fatal(err)
 	}
 
+
 	result_map := result["result"].(map[string]interface{})
 	result_num := result_map["number"].(float64)
-	if result_num != 43.0 {
+	if result_num != float64(test_rand) + float64(1.0) {
 		t.Fatal("Incorrect number returned")
 	}
-
-	// Ensure second request is cached
-	payload = map[string]interface{}{
-		"user_id": interface{}("3"),
-		"data": interface{}(map[string]int{ "number": 42 }),
-		"auth_token_key": "test_token2",
-		"auth_secret": "mysecret",
+	if result["from_cache"].(bool) != false {
+		t.Fatal("Error: First query should not be cached")
 	}
 	url = "http://localhost:6321/api/models/TestModel/predict/"
 	t.Log(url)
+
+	t.Log("=========== second query ===========")
 	err = PerformRequestAndDecode(url, "POST", &payload, &result)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Log(result)
 	if result["from_cache"].(bool) != true {
-		t.Fatal("Error: Query should be cached")
+		t.Fatal("Error: Second Query should be cached")
 	}
+
+	t.Log("=========== uncached query ===========")
+	payload["no_cache"] = true
+	err = PerformRequestAndDecode(url, "POST", &payload, &result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(result)
+	if result["from_cache"].(bool) != false {
+		t.Fatal("Error: no_cache parameter should cause result to be uncached")
+	}
+
 }

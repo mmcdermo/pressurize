@@ -66,6 +66,7 @@ func CacheGet(db *dynamodb.DynamoDB, table_name string, key string) (result stri
 		}
 		if _, ok := output.Item["expires"]; ok {
 			dynamodbattribute.Unmarshal(output.Item["expires"], &expires)
+		} else {
 		}
 	}
 	return
@@ -78,7 +79,8 @@ func TryRequestCache(model string, method string, body []byte) (res map[string]i
 		return nil, t, err
 	}
 	if expires < int(time.Now().Unix()) {
-		return nil, t, errors.New("Cache entry expired")
+		s := "Cache entry expired at " + strconv.Itoa(expires)
+		return nil, t, errors.New(s)
 	}
 	err = json.Unmarshal([]byte(resp), &res)
 	if err != nil {

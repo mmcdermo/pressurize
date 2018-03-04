@@ -122,7 +122,7 @@ func Authenticate(body map[string]interface{}) (authed bool, err error){
 
 func ModelMethodHandler(w http.ResponseWriter, r *http.Request){
 	vars := mux.Vars(r)
-	log.Println("Model method handler")
+	log.Println("Model method handler for " + vars["model"] + " " + vars["method"])
 	err := ValidModelMethod(vars["model"], vars["method"])
 	if err != nil {
 		log.Println("No valid model method")
@@ -158,10 +158,8 @@ func ModelMethodHandler(w http.ResponseWriter, r *http.Request){
 	if _, ok := parsed["no_cache"]; ok {
 		no_cache = true
 	}
-
-	var cache_body []byte
-	if true || !no_cache {
-		cache_body, err := CacheBody(parsed)
+	cache_body, err := CacheBody(parsed)
+	if !no_cache {
 		if err != nil {
 			m := map[string]string{"error": err.Error()}
 			SendResponse(w, 500, m)
@@ -170,6 +168,7 @@ func ModelMethodHandler(w http.ResponseWriter, r *http.Request){
 		cache_result, time, err := TryRequestCache(vars["model"], vars["method"], cache_body)
 		if err == nil {
 			log.Println("Returning cached response for "+ vars["model"] + "/" + vars["method"])
+			log.Println(cache_result)
 			m := map[string]interface{}{
 				"model": vars["model"],
 				"method": vars["method"],
@@ -179,6 +178,9 @@ func ModelMethodHandler(w http.ResponseWriter, r *http.Request){
 			}
 			SendResponse(w, 200, m)
 			return
+		} else {
+			log.Println("Cache err")
+			log.Println(err)
 		}
 	}
 
@@ -217,7 +219,7 @@ func ModelMethodHandler(w http.ResponseWriter, r *http.Request){
 		a := 60 * 60 * 24
 		lifetime = &a
 	}
-	if true || !no_cache {
+	if !no_cache {
 		_ = PutRequestCache(vars["model"], vars["method"], cache_body, *lifetime, result)
 	}
 	SendResponse(w, 200, m)
