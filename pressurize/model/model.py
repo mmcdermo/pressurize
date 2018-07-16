@@ -1,5 +1,4 @@
 from contextlib import contextmanager
-import tensorflow as tf
 
 class PressurizeModel(object):
     def __init__(self, resources, config=None, logger=None):
@@ -25,6 +24,7 @@ class PressurizeTFModel(PressurizeModel):
 
     @contextmanager
     def modelcontext(self, device="/cpu:0"):
+        import tensorflow as tf
         """
         Tensorflow context manager creates a new graph and executes code
         in the context of a default graph and the given tensorflow device
