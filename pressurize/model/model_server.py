@@ -24,7 +24,6 @@ import pkgutil
 
 from flask import Flask, jsonify, request, abort, make_response
 from flask_cors import CORS, cross_origin
-import tensorflow as tf
 import boto3
 import botocore
 
