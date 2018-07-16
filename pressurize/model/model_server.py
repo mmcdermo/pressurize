@@ -24,6 +24,7 @@ import pkgutil
 
 from flask import Flask, jsonify, request, abort, make_response
 from flask_cors import CORS, cross_origin
+from model_server_utils import *
 import boto3
 import botocore
 
@@ -31,8 +32,8 @@ import botocore
 class ModelServer(object):
     def __init__(self, config, source_path, resource_path, model_conf, pipe):
         self._pipe = pipe
-        self._resources = ModelServer.acquire_resources(config, model_conf, resource_path)
-        self._model_class = ModelServer.import_model(model_conf['path'], source_path)
+        self._resources = acquire_resources(config, model_conf, resource_path)
+        self._model_class = import_model(model_conf['path'], source_path)
         self._logger = self.setup_logging()
         self._model = self._model_class(self._resources, config=model_conf, logger=self._logger)
 
