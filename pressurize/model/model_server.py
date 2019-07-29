@@ -24,7 +24,7 @@ import pkgutil
 
 from flask import Flask, jsonify, request, abort, make_response
 from flask_cors import CORS, cross_origin
-from model_server_utils import *
+from .model_server_utils import *
 import boto3
 import botocore
 
