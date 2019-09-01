@@ -24,7 +24,7 @@ func MethodCanBatch(model string, method string) bool {
 	model_config := models[model]
 	for _, m := range model_config.Methods {
 		if m == "batch_" + method {
-			return true
+			return false
 		}
 	}
 	return true
