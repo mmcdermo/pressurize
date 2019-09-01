@@ -3,6 +3,7 @@ package main
 import (
 	"testing"
 	"time"
+	"log"
 	"math/rand"
 )
 
@@ -74,9 +75,10 @@ func TestAuth(t *testing.T){
 		t.Fatal("Test token should not yet have expired")
 	}
 }
+
 func TestServer(t *testing.T){
-	// NOTE: This test requires TestModel to be running locally @ localhost:6500
 	// Also requires pressurize_testcache to be a deployed DynamoDB database
+	go RunTestModelServer("6500", "TestModel")
 	go RunServer("./test_data/pressurize.json", "6321", "http://localhost:6500")
 	result := make(map[string]interface{})
 
@@ -85,7 +87,9 @@ func TestServer(t *testing.T){
 	if err != nil {
 		t.Fatal(err)
 	}
+	rand.Seed(time.Now().UTC().UnixNano())
 	test_rand := rand.Int()
+	log.Println("Test payload:", test_rand)
 	payload := map[string]interface{}{
 		"user_id": interface{}("2"),
 		"data": interface{}(map[string]int{ "number": test_rand }),
@@ -132,4 +136,60 @@ func TestServer(t *testing.T){
 		t.Fatal("Error: no_cache parameter should cause result to be uncached")
 	}
 
+}
+
+
+func TestBatch(t *testing.T){
+	// NOTE: This test requires TestModel to be running locally @ localhost:6500
+	// Also requires pressurize_testcache to be a deployed DynamoDB database
+
+	go RunTestModelServer("6500", "TestModel")
+	go RunServer("./test_data/pressurize.json", "6321", "http://localhost:6500")
+
+	db := ConnectDynamo("us-west-2")
+	err := CreateToken(db, "pressurize_testauth", "test_token2", "mysecret", 400000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Println("Test Batch")
+	concurrent_requests := 200
+	test_values := make([]int, concurrent_requests)
+	results := make([]map[string]interface{}, concurrent_requests)
+	result_chan := make([]chan error, 0)
+	for _ = range test_values {
+		result_chan = append(result_chan, make(chan error))
+	}
+	rand.Seed(time.Now().UTC().UnixNano())
+	log.Println("Test Batch")
+	for i := range test_values {
+		//time.Sleep(1000 * 1000 * 1000)
+		test_values[i] = rand.Int()
+		payload := map[string]interface{}{
+			"user_id": interface{}("2"),
+			"data": interface{}(map[string]int{ "number": test_values[i] }),
+			"auth_token_key": "test_token2",
+			"auth_secret": "mysecret",
+		}
+		url := "http://localhost:6321/api/models/TestModel/predict/"
+		go PerformAsyncRequest(url, "POST", &payload, &results[i], result_chan[i])
+	}
+	for i := range test_values {
+		err = <- result_chan[i]
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for i := range test_values {
+		result := results[i]
+		result_map := result["result"].(map[string]interface{})
+		log.Println("Result map", result_map, result)
+		result_num := result_map["number"].(float64)
+		if result_num != float64(test_values[i]) + float64(1.0) {
+			t.Fatal("Incorrect number returned")
+		}
+		if result["batched"].(bool) == false {
+			t.Fatal("Error: All queries should be batched")
+		}
+	}
 }

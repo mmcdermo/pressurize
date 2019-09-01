@@ -5,7 +5,11 @@
 	{
 	    "name": "TestModel",
 	    "path": "TestModel.TestModel",
-	    "methods": ["predict"],
+	    "batch_time_threshhold": 100,
+	    "max_size": 1,
+	    "max_batch_size": 50,
+	    "max_batch_time": 500,
+	    "methods": ["predict", "batch_predict"],
 	    "required_resources": {
 		"parameters": "s3://pressurizetest-parameters/TestModel/parameters.txt"
 	    }

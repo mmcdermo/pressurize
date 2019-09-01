@@ -20,7 +20,7 @@ func SendResponse(w http.ResponseWriter, status_code int, ptr interface{}){
 		return
 	}
 	w.WriteHeader(status_code)
-	log.Println(string(byteArray))
+	//log.Println(string(byteArray))
 	fmt.Fprint(w, string(byteArray))
 	return
 }
@@ -56,4 +56,9 @@ func PerformRequestAndDecode(url string, method string, payload interface{},
 		return err
 	}
 	return nil
+}
+
+func PerformAsyncRequest(url string, method string, payload interface{},
+	decode_target interface{}, ch chan error){
+	ch <- PerformRequestAndDecode(url, method, payload, decode_target)
 }

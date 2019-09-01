@@ -23,6 +23,9 @@ type Model struct {
 	MinECUPerInstance []string `json:"min_ecu_per_instance,omitempty"`
 	MinMemoryPerInstance []string `json:"min_memory_per_instance,omitempty"`
 	CacheLifetime *int `json:"cache_lifetime,omitempty"`
+	MinBatchTime *int `json:"min_batch_time,omitempty"`
+	MaxBatchTime *int `json:"max_batch_time,omitempty"`
+	MaxBatchSize *int `json:"max_batch_size,omitempty"`
 }
 
 type PressurizeConfig struct {
@@ -83,6 +86,7 @@ func GetMethodURL(model_name string, method_name string) string {
 
 func ModelInstanceRequest(model_name string, method_name string, data interface{}) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
+	log.Println("ModelInstanceRequest", GetMethodURL(model_name, method_name))
 	err := PerformRequestAndDecode(GetMethodURL(model_name, method_name),
 		"POST", data, &(result))
 	return result, err
@@ -184,7 +188,13 @@ func ModelMethodHandler(w http.ResponseWriter, r *http.Request){
 		}
 	}
 
-	response, err := ModelInstanceRequest(vars["model"], vars["method"], parsed)
+	var response map[string]interface{}
+	batched := MethodCanBatch(vars["model"], vars["method"])
+	if batched {
+		response, err = ModelInstanceBatchedRequest(vars["model"], vars["method"], parsed)
+	} else {
+		response, err = ModelInstanceRequest(vars["model"], vars["method"], parsed)
+	}
 	if err != nil {
 		m := map[string]string{"error": err.Error()}
 		SendResponse(w, 500, m)
@@ -209,6 +219,7 @@ func ModelMethodHandler(w http.ResponseWriter, r *http.Request){
 		"model": vars["model"],
 		"method": vars["method"],
 		"from_cache": false,
+		"batched": batched,
 		"cache_time": -1,
 		"result": result,
 	}
@@ -219,6 +230,7 @@ func ModelMethodHandler(w http.ResponseWriter, r *http.Request){
 		a := 60 * 60 * 24
 		lifetime = &a
 	}
+
 	if !no_cache {
 		_ = PutRequestCache(vars["model"], vars["method"], cache_body, *lifetime, result)
 	}
