@@ -152,7 +152,7 @@ func TestBatch(t *testing.T){
 		t.Fatal(err)
 	}
 	log.Println("Test Batch")
-	concurrent_requests := 200
+	concurrent_requests := 10
 	test_values := make([]int, concurrent_requests)
 	results := make([]map[string]interface{}, concurrent_requests)
 	result_chan := make([]chan error, 0)

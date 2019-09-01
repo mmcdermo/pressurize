@@ -24,7 +24,7 @@ func BatchTestModelHandler(w http.ResponseWriter, r *http.Request){
 		return
 	}
 	data := parsed["requests"].([]interface{})
-	time.Sleep(1)
+	time.Sleep(1000 * 1000 * 1000)
 	responses := make([]map[string]interface{}, 0)
 	for _, d := range data {
 		dm := d.(map[string]interface{})
@@ -54,7 +54,7 @@ func TestModelHandler(w http.ResponseWriter, r *http.Request){
 		return
 	}
 	n := parsed["data"].(map[string]interface{})["number"].(float64)
-	time.Sleep(1)
+	time.Sleep(1000 * 1000 * 1000)
 	m := map[string]interface{}{
 		"result": map[string]float64{
 			"number": n + 1,
