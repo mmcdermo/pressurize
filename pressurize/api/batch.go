@@ -14,7 +14,6 @@ type MethodRequestBatch struct {
 	last_setup int64
 }
 var (
-	//
 	method_request_batch map[string]map[string]MethodRequestBatch
 	batch_lock sync.RWMutex
 )
@@ -27,7 +26,7 @@ func MethodCanBatch(model string, method string) bool {
 			return false
 		}
 	}
-	return true
+	return false
 }
 
 func BatchModelConfig(model_name string) Model {
@@ -79,25 +78,19 @@ func appendMethodRequestBatch(model string, method string, parsed map[string]int
 
 func shouldWait(model string, method string) bool {
 	mrb := method_request_batch[model][method]
-	//return false // TODO
 	conf := BatchModelConfig(model)
 	if len(mrb.requests) + 1 >= *conf.MaxBatchSize {
+		log.Println("Firing. > MaxBatchSize")
 		return false
 	}
 	if len(mrb.requests) == 0 && time.Now().UTC().UnixNano() - mrb.last_setup > int64(*conf.MinBatchTime) * 1000 * 1000 {
+		log.Println("Firing. First request")
 		return false
 	}
 	if time.Now().UTC().UnixNano() - mrb.first_request > int64(*conf.MaxBatchTime * 1000 * 1000) {
+		log.Println("Firing. Duration between requests too long")
 		return false
 	}
-	//if time.Now().UTC().UnixNano() - mrb.last_request < config.Models[model].MinBatchTime {
-	//	return true
-	//}
-
-	// TODO
-	//if len(mrb.requests) == 0 {
-	//	return false
-	//}
 	return true
 }
 
@@ -148,6 +141,7 @@ func ModelInstanceBatchedRequest(model string, method string, parsed map[string]
 		go setupTimer(model, method)
 	} else {
 		fireBatchedRequest(model, method)
+		setupMethodRequestBatch(model, method)
 	}
 	batch_lock.Unlock()
 	response := <- response_chan
@@ -155,25 +149,29 @@ func ModelInstanceBatchedRequest(model string, method string, parsed map[string]
 }
 
 
-func fireBatchedRequest(model string, method string) (map[string]interface{}, error){
+func fireBatchedRequest(model string, method string) {
 	log.Println("BATCHED REQUEST", model, method)
 	mrb := method_request_batch[model][method]
-	result := make(map[string]interface{})
 	payload := map[string]interface{}{
 		"requests": mrb.requests,
 	}
+	go asyncBatchedRequest(model, method, payload, mrb.response_chans)
+}
+
+func asyncBatchedRequest(model string, method string, payload map[string]interface{}, response_chans []chan map[string]interface{}) {
+	// TODO: Error handling.
+	result := make(map[string]interface{})
 	err := PerformRequestAndDecode(GetBatchMethodURL(model, method),
 		"POST", payload, &(result))
-	result["batched"] = false
+	log.Println(err)
+	result["batched"] = true
 	//err := <-ch
-
 	responses := result["responses"].([]interface{})
 	log.Println("Number responses", len(responses))
 	for i, r := range responses {
 		response := r.(map[string]interface{})
 		response["batched"] = true
-		mrb.response_chans[i] <- response
+		response_chans[i] <- response
 	}
-	setupMethodRequestBatch(model, method)
-	return result, err //map[string]interface{}{"result": result}, err
+	//return result, err //map[string]interface{}{"result": result}, err
 }
