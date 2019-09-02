@@ -27,6 +27,8 @@ func SendResponse(w http.ResponseWriter, status_code int, ptr interface{}){
 
 //Perform an HTTP request with the given payload
 func PerformRequest(url string, method string, payload interface{}) (*http.Response, error) {
+	log.Println("PerformRequest")
+	log.Println(payload)
 	j,_ := json.Marshal(payload)
 	req, err := http.NewRequest(method, url, bytes.NewBuffer(j))
 	if err != nil {

@@ -23,20 +23,24 @@ func BatchTestModelHandler(w http.ResponseWriter, r *http.Request){
 		SendResponse(w, 400, m)
 		return
 	}
-	data := parsed["requests"].([]interface{})
+	log.Println("+++++")
+	log.Println(parsed)
+	requests := parsed["requests"].([]interface{})
 	time.Sleep(1000 * 1000 * 1000)
 	responses := make([]map[string]interface{}, 0)
-	for _, d := range data {
-		dm := d.(map[string]interface{})
+	for _, r := range requests {
+		dm := r.(map[string]interface{})
 		n := dm["data"].(map[string]interface{})["number"].(float64)
 		m := map[string]interface{}{
-			"result": map[string]float64{
-				"number": n + 1,
-			},
+			"number": n + 1,
 		}
 		responses = append(responses, m)
 	}
-	SendResponse(w, 200, map[string]interface{}{"responses": responses})
+	SendResponse(w, 200, map[string]interface{}{
+		"result": map[string]interface{}{
+			"responses": responses,
+		},
+	})
 }
 
 

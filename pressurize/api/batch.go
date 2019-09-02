@@ -160,18 +160,19 @@ func fireBatchedRequest(model string, method string) {
 
 func asyncBatchedRequest(model string, method string, payload map[string]interface{}, response_chans []chan map[string]interface{}) {
 	// TODO: Error handling.
-	result := make(map[string]interface{})
+	resp := make(map[string]interface{})
 	err := PerformRequestAndDecode(GetBatchMethodURL(model, method),
-		"POST", payload, &(result))
+		"POST", payload, &(resp))
 	log.Println(err)
-	result["batched"] = true
 	//err := <-ch
+	result := resp["result"].(map[string]interface{})
 	responses := result["responses"].([]interface{})
 	log.Println("Number responses", len(responses))
 	for i, r := range responses {
 		response := r.(map[string]interface{})
-		response["batched"] = true
-		response_chans[i] <- response
+		response_chans[i] <- map[string]interface{}{
+			"result": response,
+		}
 	}
 	//return result, err //map[string]interface{}{"result": result}, err
 }

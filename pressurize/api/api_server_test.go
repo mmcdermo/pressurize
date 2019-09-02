@@ -56,6 +56,7 @@ func TestAuth(t *testing.T){
 	}
 	token, err := TokenLookup(db, "pressurize_testauth", "test_token")
 	if err != nil {
+
 		t.Fatal(err)
 	}
 	if token.Expires > int64(time.Now().Unix()) {
@@ -152,7 +153,7 @@ func TestBatch(t *testing.T){
 		t.Fatal(err)
 	}
 	log.Println("Test Batch")
-	concurrent_requests := 20
+	concurrent_requests := 1
 	test_values := make([]int, concurrent_requests)
 	results := make([]map[string]interface{}, concurrent_requests)
 	result_chan := make([]chan error, 0)
