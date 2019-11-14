@@ -36,6 +36,7 @@ class ModelServer(object):
         self._model_class = import_model(model_conf['path'], source_path)
         self._logger = self.setup_logging()
         self._model = self._model_class(self._resources, config=model_conf, logger=self._logger)
+        print("ModelServer initialized")
 
     def setup_logging(self):
         handler = logging.handlers.WatchedFileHandler(
@@ -50,9 +51,12 @@ class ModelServer(object):
     def run(self):
         #logger = multiprocessing.log_to_stderr()
         self._logger.info('About to enter model processing loop')
+        print("run()")
         try:
             with self._model.modelcontext():
+                print("Modelcontext Initialized")
                 while True:
+                    print("Received item. Processing")
                     item = self._pipe.recv()
                     if not hasattr(self._model, item['method']):
                         self._pipe.send({"error": "Model does not have method %s" % item['method']})
@@ -65,6 +69,8 @@ class ModelServer(object):
                         self._logger.exception("Encountered error during invocation of method %s: %s" %
                                      (item['method'], str(e)))
         except Exception as e:
+            print("Unexpected error encountered during model setup or request processing.")
+            print(e)
             self._logger.exception("Unexpected error encountered during model setup or request processing.")
 
     @staticmethod
@@ -116,6 +122,7 @@ class ModelServer(object):
                 raise RuntimeError("Failed to download resource '%s' @ %s: %s" % \
                       (resource_name, s3_path, str(e)))
             resources[resource_name] = local_path
+        print("Resources Acquired")
         return resources
 
 serverPipeLock = Lock()
