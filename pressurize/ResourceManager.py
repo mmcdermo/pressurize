@@ -83,9 +83,10 @@ class ResourceManager(object):
         for resource_name in model["required_resources"]:
             resource = model["required_resources"][resource_name]
             if("s3://" in resource):
-                parts = resource.split("/")
+                parts = resource.split("//")
                 if len(parts) < 3:
                     raise RuntimeError("Invalid s3 url in configuration: %s" % resource)
+                print("S3 Bucket Resource:", parts[2])
                 bucket_names[parts[2]] = True
             if("dynamodb://" in resource):
                 parts = resource.split("//")
@@ -213,10 +214,11 @@ class ResourceManager(object):
                 "InstanceType": conf.get('api_instance_type', 't2.micro')
             },
             "aws:elasticbeanstalk:command": {
-                "DeploymentPolicy": "Immutable"
+                "DeploymentPolicy": "Rolling"
             },
             "aws:autoscaling:updatepolicy:rollingupdate": {
-                "RollingUpdateType": "Immutable"
+                "RollingUpdateEnabled": True,
+                "RollingUpdateType": "Time"
             },
             "aws:elasticbeanstalk:healthreporting:system": {
                 "SystemType": "enhanced"
@@ -304,13 +306,20 @@ class ResourceManager(object):
             },
             "aws:autoscaling:launchconfiguration": {
                 "InstanceType": instance_type,
-                "RootVolumeSize": str(model_config.get('storage_gb', 16))
+                "RootVolumeSize": str(model_config.get('storage_gb', 16)),
+                "BlockDeviceMappings": "/dev/xvdcz=:128:true"
             },
             "aws:elasticbeanstalk:command": {
-                "DeploymentPolicy": "Immutable"
+                "DeploymentPolicy": "Rolling",
+                "BatchSizeType": "Percentage",
+                "BatchSize": "100"
             },
             "aws:autoscaling:updatepolicy:rollingupdate": {
-                "RollingUpdateType": "Immutable"
+                "RollingUpdateEnabled": True,
+                "RollingUpdateType": "Time",
+                "MaxBatchSize": 3,
+                "MinInstancesInService": 2,
+                "PauseTime": "PT5M30S"
             },
             "aws:elasticbeanstalk:healthreporting:system": {
                 "SystemType": "enhanced"

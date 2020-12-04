@@ -2,6 +2,7 @@ FROM python:3.6.3
 COPY ./ /var/code/
 RUN for D in `find /var/code/models/ -maxdepth 1 -mindepth 1 -type d`; do pip install -e "${D}"; ls; done;
 RUN cd /var/code/ && git clone https://github.com/mmcdermo/pressurize && cd pressurize && pip install -e .
+RUN pip install -U pip;
 RUN if [ -f /var/code/requirements.txt ]; then pip install -r /var/code/requirements.txt; fi
 RUN mkdir /root/.aws/
 RUN ls /var/code/
