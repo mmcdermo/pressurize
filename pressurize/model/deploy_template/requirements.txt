@@ -1,7 +1,7 @@
 boto3==1.4.8
 tensorflow==1.15.2
 pandas==0.21.0
-numpy==1.13.3
+numpy==1.22.0
 bs4==0.0.1
 Flask==0.12.2
 Flask-Cors==3.0.3
